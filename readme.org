@@ -1,0 +1,44 @@
+* Massively Parallel Empirical Bayes Poisson Means 
+
+  This package provides GPU-accelerated inference for the /Empirical Bayes
+  Poisson Means/ problem:
+
+  #+BEGIN_EXAMPLE
+    x_ij | s_i lambda_ij ~ Poisson(s_i lambda_ij)
+    lambda_ij ~ g_j(lambda_ij)
+  #+END_EXAMPLE
+
+  The implementation readily supports fitting this model for data on the order
+  of 10^6 cells and 10^4 genes in parallel. It also supports fitting a
+  specialized factor model where binary, fixed loadings assign cells to groups
+  and groups have different prior distributions (Sarkar et al. 2019):
+
+  #+BEGIN_EXAMPLE
+    lambda_ij ~ (L F')_ij
+    f_jk ~ g_jk(f_jk)
+  #+END_EXAMPLE
+
+** Installation
+
+   Install using conda:
+
+   #+BEGIN_SRC ipython
+     conda install -c aksarkar mpbebpm
+   #+END_SRC
+
+   Install using pip (development version only):
+
+   #+BEGIN_SRC ipython
+     pip install git+https://www.github.com/aksarkar/mbebpm.git
+   #+END_SRC
+
+** Usage
+
+   #+BEGIN_SRC ipython
+     import mbebpm
+     # This automatically uses the GPU if available, and supports x in sparse matrix
+     # formats (silently converts to CSR in this case).
+     #
+     # By default, size factors are taken to equal the total counts per sample
+     log_mean, log_inv_disp = mbebpm.ebpm_gamma(x)
+   #+END_SRC
