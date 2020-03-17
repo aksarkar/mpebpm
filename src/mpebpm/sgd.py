@@ -1,7 +1,12 @@
 """Empirical Bayes Poisson Means via SGD
 
-These implementations are specialized for fitting p EBPM problems on n samples
-in parallel, where n, p may be large.
+These implementations are specialized for two scenarios:
+
+1. Fitting p EBPM problems on n samples in parallel, where n, p may be large
+
+2. Fitting p * k EBPM problems in parallel, where the n samples are assumed to
+   be drawn from a discrete (known) choice of k different priors (for each
+   gene)
 
 """
 import mpebpm.sparse
