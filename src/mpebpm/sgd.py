@@ -9,7 +9,7 @@ import scipy.sparse as ss
 import torch
 import torch.utils.data as td
 
-def _nb_llik(x, s, log_mean, log_inv_disp):
+def _nb_llik(x, s, log_mean, log_inv_disp, onehot=None):
   """Return ln p(x_i | s_i, g)
 
   x_i ~ Poisson(s_i lambda_i)
@@ -17,12 +17,18 @@ def _nb_llik(x, s, log_mean, log_inv_disp):
 
   x - [n, p] tensor
   s - [n, 1] tensor
-  log_mean - [1, p] tensor
-  log_inv_disp - [1, p] tensor
+  log_mean - [k, p] tensor (default: k = 1)
+  log_inv_disp - [k, p] tensor (default: k = 1)
+  onehot - [n, k] tensor
 
   """
-  mean = torch.matmul(s, torch.exp(log_mean))
-  inv_disp = torch.exp(log_inv_disp)
+  if onehot is None:
+    mean = torch.matmul(s, torch.exp(log_mean))
+    inv_disp = torch.exp(log_inv_disp)
+  else:
+    # This is OK for minibatches, but not for batch GD
+    mean = s * torch.matmul(onehot, torch.exp(log_mean))
+    inv_disp = torch.matmul(onehot, torch.exp(log_inv_disp))
   return (x * torch.log(mean / inv_disp)
           - x * torch.log(1 + mean / inv_disp)
           - inv_disp * torch.log(1 + mean / inv_disp)
@@ -31,7 +37,7 @@ def _nb_llik(x, s, log_mean, log_inv_disp):
           - torch.lgamma(inv_disp)
           - torch.lgamma(x + 1))
 
-def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
+def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, onehot=None):
   """Return ln p(x_i | s_i, g)
 
   x_i ~ Poisson(s_i lambda_i)
@@ -39,11 +45,14 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
 
   x - [n, p] tensor
   s - [n, 1] tensor
-  log_mean - [1, p] tensor
-  log_inv_disp - [1, p] tensor
-  logodds - [1, p] tensor
+  log_mean - [k, p] tensor (default: k = 1)
+  log_inv_disp - [k, p] tensor (default: k = 1)
+  logodds - [k, p] tensor (default: k = 1)
+  onehot - [n, k] tensor
 
   """
+  if onehot is not None:
+    logodds = torch.matmul(onehot, logodds)
   nb_llik = _nb_llik(x, s, log_mean, log_inv_disp)
   softplus = torch.nn.functional.softplus
   case_zero = -softplus(-logodds) + softplus(nb_llik - logodds)
@@ -78,6 +87,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     onehot = mpebpm.sparse.CSRTensor(onehot.data, onehot.indices, onehot.indptr, dtype=torch.float)
     data = mpebpm.sparse.SparseDataset(x, s, onehot)
   else:
+    # Important: don't return onehot = torch.ones(n) because this might be big
     data = mpebpm.sparse.SparseDataset(x, s)
     k = 1
   if init is None:
