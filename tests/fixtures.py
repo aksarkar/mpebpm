@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
+import scipy.sparse as ss
 import scipy.special as sp
 import scipy.stats as st
+import torch
 
 def _simulate_gamma():
   n = 500
@@ -33,3 +35,9 @@ def simulate_point_gamma():
   llik_nonzero = np.log(1 - pi0) + F.logpmf(y)
   llik = np.where(y < 1, np.log(pi0 + np.exp(llik_nonzero)), llik_nonzero).sum()
   return y, s, log_mu, log_phi, logodds, llik
+
+@pytest.fixture
+def csr_matrix():
+  np.random.seed(0)
+  x = ss.random(m=10, n=5, density=0.1).tocsr()
+  return x
