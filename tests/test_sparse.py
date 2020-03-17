@@ -16,14 +16,11 @@ def test_CSRTensor(csr_matrix):
 
 def test_CSRTensor___getitem__(csr_matrix):
   x = csr_matrix
-  x0 = x[[0]].tocoo()
+  x0 = x[0].A.ravel()
   xt = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, x.shape)
-  # Important: coalesce() is required by torch.sparse.FloatTensor
-  xt0 = xt[[0]].coalesce()
-  assert x0.shape == tuple(xt0.shape)
-  assert (x0.row == xt0.indices()[0].numpy()).all()
-  assert (x0.col == xt0.indices()[1].numpy()).all()
-  assert np.isclose(x0.data, xt0.values().numpy()).all()
+  xt0 = xt[[0]].numpy()
+  assert x0.shape == xt0.shape
+  assert np.isclose(x0, xt0).all()
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires cuda')
 def test_CSRTensor_cuda(csr_matrix):
@@ -64,9 +61,9 @@ def test_SparseDataset_collate_fn_CSRTensor(simulate_point_gamma):
   batch_size = 10
   y, t = data.collate_fn(range(batch_size))
   if torch.cuda.is_available():
-    assert (y.cpu().to_dense().numpy() == x[:batch_size]).all()
+    assert (y.cpu().numpy() == x[:batch_size]).all()
   else:
-    assert (y.to_dense().numpy() == x[:batch_size]).all()
+    assert (y.numpy() == x[:batch_size]).all()
 
 def test_SparseDataset_collate_fn_shuffle(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma

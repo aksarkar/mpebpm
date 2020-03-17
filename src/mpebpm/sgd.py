@@ -7,6 +7,7 @@ in parallel, where n, p may be large.
 import mpebpm.sparse
 import scipy.sparse as ss
 import torch
+import torch.utils.data as td
 
 def _nb_llik(x, s, log_mean, log_inv_disp):
   """Return ln p(x_i | s_i, g)
@@ -53,7 +54,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
   """Check x, s, onehot and return a DataLoader"""
   n, p = x.shape
   if s is None:
-    s = x.sum(axis=1)
+    s = torch.tensor(x.sum(axis=1), dtype=torch.float)
   elif s.shape != (n, 1):
     raise ValueError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
   elif not isinstance(s, torch.FloatTensor):
@@ -65,10 +66,9 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
   if ss.issparse(x):
     if not ss.isspmatrix_csr(x):
       x = x.tocsr()
-    x = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, dtype=torch.float)
+    x = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, x.shape, dtype=torch.float)
   elif not isinstance(x, torch.Tensor):
     x = torch.tensor(x, dtype=torch.float)
-  k = 1
   if onehot is not None:
     if onehot.shape[0] != n:
       raise ValueError(f'shape mismatch (onehot): expected ({n}, k), got {onehot.shape}')
@@ -79,6 +79,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     data = mpebpm.sparse.SparseDataset(x, s, onehot)
   else:
     data = mpebpm.sparse.SparseDataset(x, s)
+    k = 1
   if init is None:
     pass
   elif init[0].shape != (k, p):
@@ -93,7 +94,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     raise ValueError('batch_size must be >= 1')
   if max_epochs < 1:
     raise ValueError('max_epochs must be >= 1')
-  return data, n, p
+  return data, n, p, k
 
 def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_workers=0, verbose=False, trace=False):
   """SGD subroutine
