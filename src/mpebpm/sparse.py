@@ -28,3 +28,9 @@ class CSRTensor:
                      self.indices[self.indptr[i]:self.indptr[i + 1]]]) for j, i in enumerate(idx)], dim=1),
       torch.cat([self.data[self.indptr[i]:self.indptr[i + 1]] for i in idx]),
       size=[len(idx), self.shape[1]])
+
+  def cuda(self):
+    self.data = self.data.cuda()
+    self.indices = self.indices.cuda()
+    self.indptr = self.indptr.cuda()
+    return self

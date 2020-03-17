@@ -15,6 +15,7 @@ def test_CSRTensor(csr_matrix):
   xt = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, x.shape)
   assert np.isclose(xt.data.numpy(), x.data).all()
   assert (xt.indices.numpy() == x.indices).all()
+  assert (xt.indptr.numpy() == x.indptr).all()
   assert tuple(xt.shape) == x.shape
 
 def test_CSRTensor___getitem__(csr_matrix):
@@ -28,3 +29,10 @@ def test_CSRTensor___getitem__(csr_matrix):
   assert (x0.col == xt0.indices()[1].numpy()).all()
   assert np.isclose(x0.data, xt0.values().numpy()).all()
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='requires cuda')
+def test_CSRTensor_cuda(csr_matrix):
+  x = csr_matrix
+  xt = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, x.shape).cuda()
+  assert np.isclose(xt.data.cpu().numpy(), x.data).all()
+  assert (xt.indices.cpu().numpy() == x.indices).all()
+  assert (xt.indptr.cpu().numpy() == x.indptr).all()
