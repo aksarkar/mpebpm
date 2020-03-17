@@ -23,22 +23,22 @@
    Install using conda:
 
    #+BEGIN_SRC ipython
-     conda install -c aksarkar mpbebpm
+     conda install -c aksarkar mpebpm
    #+END_SRC
 
    Install using pip (development version only):
 
    #+BEGIN_SRC ipython
-     pip install git+https://www.github.com/aksarkar/mbebpm.git
+     pip install git+https://www.github.com/aksarkar/mpebpm.git
    #+END_SRC
 
 ** Usage
 
    #+BEGIN_SRC ipython
-     import mbebpm
+     import mpebpm
      # This automatically uses the GPU if available, and supports x in sparse matrix
      # formats (silently converts to CSR in this case).
      #
      # By default, size factors are taken to equal the total counts per sample
-     log_mean, log_inv_disp = mbebpm.ebpm_gamma(x)
+     log_mean, log_inv_disp = mpebpm.ebpm_gamma(x)
    #+END_SRC
