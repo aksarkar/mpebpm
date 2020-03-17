@@ -7,33 +7,33 @@ import mpebpm.sgd
 import torch
 import torch.utils.data as td
 
-from .fixtures import *
+from fixtures import *
 
 def test__nb_llik(simulate_gamma):
   x, s, log_mu, log_phi, oracle_llik = simulate_gamma
   llik = mpebpm.sgd._nb_llik(torch.tensor(x, dtype=torch.float),
-                                   torch.tensor(s, dtype=torch.float),
-                                   torch.tensor(log_mu, dtype=torch.float),
-                                   torch.tensor(-log_phi, dtype=torch.float)).sum()
+                             torch.tensor(s, dtype=torch.float),
+                             torch.tensor(log_mu, dtype=torch.float),
+                             torch.tensor(-log_phi, dtype=torch.float)).sum()
   assert np.isclose(llik, oracle_llik)
 
 def test__zinb_llik(simulate_gamma):
   x, s, log_mu, log_phi, oracle_llik = simulate_gamma
   llik = mpebpm.sgd._zinb_llik(torch.tensor(x, dtype=torch.float),
-                                     torch.tensor(s, dtype=torch.float),
-                                     torch.tensor(log_mu, dtype=torch.float),
-                                     torch.tensor(-log_phi, dtype=torch.float),
-                                     torch.tensor(-100, dtype=torch.float)).sum()
+                               torch.tensor(s, dtype=torch.float),
+                               torch.tensor(log_mu, dtype=torch.float),
+                               torch.tensor(-log_phi, dtype=torch.float),
+                               torch.tensor(-100, dtype=torch.float)).sum()
   assert np.isclose(llik, oracle_llik)
 
 def test__zinb_llik_zinb_data(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, oracle_llik = simulate_point_gamma
   n, p = x.shape
   llik = mpebpm.sgd._zinb_llik(torch.tensor(x, dtype=torch.float),
-                                     torch.tensor(s, dtype=torch.float),
-                                     torch.tensor(log_mu, dtype=torch.float),
-                                     torch.tensor(-log_phi, dtype=torch.float),
-                                     torch.tensor(logodds, dtype=torch.float)).sum()
+                               torch.tensor(s, dtype=torch.float),
+                               torch.tensor(log_mu, dtype=torch.float),
+                               torch.tensor(-log_phi, dtype=torch.float),
+                               torch.tensor(logodds, dtype=torch.float)).sum()
   assert np.isclose(llik, oracle_llik)
 
 def test_ebpm_gamma_batch(simulate_gamma):
@@ -166,7 +166,7 @@ def test_EBPMDataset_init_dense(simulate_point_gamma):
     y = ss.csr_matrix((data.data.cpu().numpy(), data.indices.cpu().numpy(), data.indptr.cpu().numpy()))
   else:
     y = ss.csr_matrix((data.data.numpy(), data.indices.numpy(), data.indptr.numpy()))
-  assert (y.todense() == x).all()
+    assert (y.todense() == x).all()
 
 def test_EBPMDataset_init_coo(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma
@@ -176,7 +176,7 @@ def test_EBPMDataset_init_coo(simulate_point_gamma):
     z = ss.csr_matrix((data.data.cpu().numpy(), data.indices.cpu().numpy(), data.indptr.cpu().numpy())).tocoo()
   else:
     z = ss.csr_matrix((data.data.numpy(), data.indices.numpy(), data.indptr.numpy())).tocoo()
-  # This is more efficient than ==
+    # This is more efficient than ==
   assert not (y != z).todense().any()
 
 def test_EBPMDataset__get_item__(simulate_point_gamma):
