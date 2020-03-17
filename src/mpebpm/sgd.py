@@ -49,8 +49,8 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
   case_non_zero = -softplus(logodds) + nb_llik
   return torch.where(torch.lt(x, 1), case_zero, case_non_zero)
 
-def _check_args(x, s, init, lr, batch_size, max_epochs):
-  """Check x, s and return a DataLoader"""
+def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
+  """Check x, s, onehot and return a DataLoader"""
   n, p = x.shape
   if s is None:
     s = x.sum(axis=1)
@@ -63,19 +63,28 @@ def _check_args(x, s, init, lr, batch_size, max_epochs):
   if any(s == 0):
     raise ValueError(f'all size factors must be > 0')
   if ss.issparse(x):
-    data = EBPMDataset(x, s)
+    if not ss.isspmatrix_csr(x):
+      x = x.tocsr()
+    x = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, dtype=torch.float)
   elif not isinstance(x, torch.Tensor):
     x = torch.tensor(x, dtype=torch.float)
-    if torch.cuda.is_available():
-      x = x.cuda()
-      s = s.cuda()
-    data = td.TensorDataset(x, s)
+  k = 1
+  if onehot is not None:
+    if onehot.shape[0] != n:
+      raise ValueError(f'shape mismatch (onehot): expected ({n}, k), got {onehot.shape}')
+    k = onehot.shape[1]
+    if not ss.issparse(onehot):
+      onehot = ss.csr_matrix(onehot)
+    onehot = mpebpm.sparse.CSRTensor(onehot.data, onehot.indices, onehot.indptr, dtype=torch.float)
+    data = mpebpm.sparse.SparseDataset(x, s, onehot)
+  else:
+    data = mpebpm.sparse.SparseDataset(x, s)
   if init is None:
     pass
-  elif init[0].shape != (1, p):
-    raise ValueError(f'shape mismatch (log_mu): expected {(1, p)}, got {init[0].shape}')
-  elif init[1].shape != (1, p):
-    raise ValueError(f'shape mismatch (log_phi): expected {(1, p)}, got {init[1].shape}')
+  elif init[0].shape != (k, p):
+    raise ValueError(f'shape mismatch (log_mu): expected {(k, p)}, got {init[0].shape}')
+  elif init[1].shape != (k, p):
+    raise ValueError(f'shape mismatch (log_phi): expected {(k, p)}, got {init[1].shape}')
   elif len(init) > 2:
     raise ValueError('expected two values in init, got {len(init)}')
   if lr <= 0:
@@ -86,7 +95,7 @@ def _check_args(x, s, init, lr, batch_size, max_epochs):
     raise ValueError('max_epochs must be >= 1')
   return data, n, p
 
-def _sgd(data, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_workers=0, verbose=False, trace=False):
+def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_workers=0, verbose=False, trace=False):
   """SGD subroutine
 
   x - [n, p] tensor
@@ -133,7 +142,7 @@ def _sgd(data, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_worker
     result.append(param_trace)
   return result
 
-def ebpm_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
+def ebpm_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -144,22 +153,22 @@ distribution
   init - (log_mu, log_phi) [1, p]
 
   """
-  data, n, p = _check_args(x, s, init, lr, batch_size, max_epochs)
+  data, n, p, k = _check_args(x, s, onehot, init, lr, batch_size, max_epochs)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
     device = 'cpu'
   if init is None:
-    log_mean = torch.zeros([1, p], dtype=torch.float, requires_grad=True, device=device)
-    log_inv_disp = torch.zeros([1, p], dtype=torch.float, requires_grad=True, device=device)
+    log_mean = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
+    log_inv_disp = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
   else:
     log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True, device=device)
     log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
-  return _sgd(data, llik=_nb_llik, params=[log_mean, log_inv_disp], lr=lr,
-              batch_size=batch_size, max_epochs=max_epochs, verbose=verbose,
+  return _sgd(data, onehot=onehot, llik=_nb_llik, params=[log_mean, log_inv_disp],
+              lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose,
               trace=trace)
 
-def ebpm_point_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
+def ebpm_point_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -170,11 +179,11 @@ distribution
   init - (log_mu, -log_phi) [1, p]
 
   """
-  data, n, p = _check_args(x, s, init, lr, batch_size, max_epochs)
+  data, n, p, k = _check_args(x, s, onehot, init, lr, batch_size, max_epochs)
   if init is None:
     if verbose:
       print('Fitting ebpm_gamma to get initialization')
-    res = ebpm_gamma(x, s, lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose)
+    res = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose)
     init = res[:-1]
   if torch.cuda.is_available():
     device = 'cuda'
@@ -183,7 +192,7 @@ distribution
   log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True, device=device)
   log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
   # Important: start pi_j near zero (on the logit scale)
-  logodds = torch.full([1, p], -8, dtype=torch.float, requires_grad=True, device=device)
-  return _sgd(data, llik=_zinb_llik, params=[log_mean, log_inv_disp, logodds],
+  logodds = torch.full([k, p], -8, dtype=torch.float, requires_grad=True, device=device)
+  return _sgd(data, onehot=onehot, llik=_zinb_llik, params=[log_mean, log_inv_disp, logodds],
               lr=lr, batch_size=batch_size, max_epochs=max_epochs,
               verbose=verbose, trace=trace)
