@@ -58,7 +58,7 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, onehot=None):
   """
   if onehot is not None:
     logodds = torch.matmul(onehot, logodds)
-  nb_llik = _nb_llik(x, s, log_mean, log_inv_disp)
+  nb_llik = _nb_llik(x, s, log_mean, log_inv_disp, onehot=onehot)
   softplus = torch.nn.functional.softplus
   case_zero = -softplus(-logodds) + softplus(nb_llik - logodds)
   case_non_zero = -softplus(logodds) + nb_llik
@@ -89,7 +89,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     k = onehot.shape[1]
     if not ss.issparse(onehot):
       onehot = ss.csr_matrix(onehot)
-    onehot = mpebpm.sparse.CSRTensor(onehot.data, onehot.indices, onehot.indptr, dtype=torch.float)
+    onehot = mpebpm.sparse.CSRTensor(onehot.data, onehot.indices, onehot.indptr, onehot.shape, dtype=torch.float)
   else:
     # Important: don't use onehot = torch.ones(n) because this might be big
     k = 1
@@ -141,10 +141,15 @@ def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, nu
   param_trace = []
   loss = None
   for epoch in range(max_epochs):
-    for (x, s) in data:
+    for batch in data:
       opt.zero_grad()
       # Important: params are assumed to be provided in the order assumed by llik
-      loss = -llik(x, s, *params).sum()
+      if onehot is not None:
+        x, s, y = batch
+        loss = -llik(x, s, *params, onehot=y).sum()
+      else:
+        x, s = batch
+        loss = -llik(x, s, *params).sum()
       if torch.isnan(loss):
         raise RuntimeError('nan loss')
       loss.backward()
