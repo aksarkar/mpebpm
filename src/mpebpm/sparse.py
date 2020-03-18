@@ -1,9 +1,8 @@
 """Support for sparse tensors
 
-Implement the minimal functionality needed to use a CSR-format matrix in
-torch.utils.data.TensorDataset. In our application, we don't need gradients
-with respect to the sparse matrix, only sparse-dense matrix multiplication in
-the forward pass.
+Our strategy for supporting sparse tensors is to implement CSR indexing and
+efficient slicing ourselves (not currently implemented in torch), and
+implementing a new DataSet type which can exploit this efficient slice.
 
 """
 import torch
@@ -47,46 +46,40 @@ class CSRTensor:
     return self
 
 class SparseDataset(td.Dataset):
-  """Specialized dataset type for zipping sparse and dense tensors"""
+  """Specialized dataset type for zipping sparse and dense tensors
+
+  torch.utils.DataLoader.__next__() calls:
+
+  batch = self.collate_fn([self.dataset[i] for i in indices])
+
+  This is too slow, so instead of actually returning the data, like:
+
+  start = self.indptr[index]
+  end = self.indptr[index + 1]
+  return (
+    torch.sparse.FloatTensor(
+      # Important: sparse indices are long in Torch
+      torch.stack([torch.zeros(end - start, dtype=torch.long, device=self.indices.device), self.indices[start:end]]),
+      # Important: this needs to be 1d before collate_fn
+      self.data[start:end], size=[1, self.p]).to_dense().squeeze(),
+    self.s[index]
+  )
+
+  and then concatenating in collate_fn, just return the index.
+
+  """
   def __init__(self, *tensors):
     super().__init__()
     self.tensors = tensors
     self.n = min(t.shape[0] for t in self.tensors)
 
   def __getitem__(self, index):
-    """Dummy implementation of __getitem__
-
-    torch.utils.DataLoader.__next__() calls:
-
-    batch = self.collate_fn([self.dataset[i] for i in indices])
-
-    This is too slow, so instead of actually returning the data, like:
-
-    start = self.indptr[index]
-    end = self.indptr[index + 1]
-    return (
-      torch.sparse.FloatTensor(
-        # Important: sparse indices are long in Torch
-        torch.stack([torch.zeros(end - start, dtype=torch.long, device=self.indices.device), self.indices[start:end]]),
-        # Important: this needs to be 1d before collate_fn
-        self.data[start:end], size=[1, self.p]).to_dense().squeeze(),
-      self.s[index]
-    )
-
-    and then concatenating in collate_fn, just return the index.
-    """
+    """Dummy implementation of __getitem__"""
     return index
     
   def __len__(self):
     return self.n
 
   def collate_fn(self, indices):
-    """Return a minibatch of items
-
-    Construct the entire sparse tensor in one shot, and then convert to
-    dense. This is *much* faster than the default:
-
-    torch.stack([data[i] for i in indices])
-
-    """
+    """Return a minibatch of items"""
     return [t[indices] for t in self.tensors]
