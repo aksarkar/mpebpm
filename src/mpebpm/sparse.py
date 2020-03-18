@@ -17,8 +17,10 @@ class CSRTensor:
   """
   def __init__(self, data, indices, indptr, shape, dtype=torch.float):
     self.data = torch.tensor(data, dtype=dtype)
-    self.indices = torch.tensor(indices, dtype=torch.long)
-    self.indptr = torch.tensor(indptr, dtype=torch.long)
+    # Important: torch.sparse uses long for indices, but for our purposes int
+    # is sufficient
+    self.indices = torch.tensor(indices, dtype=torch.int)
+    self.indptr = torch.tensor(indptr, dtype=torch.int)
     self.shape = torch.Size(shape)
 
   def __getitem__(self, idx):
@@ -33,7 +35,8 @@ class CSRTensor:
       torch.cat([
         torch.stack([torch.full(((self.indptr[i + 1] - self.indptr[i]).item(),), j,
                                 dtype=torch.long, device=self.data.device),
-                     self.indices[self.indptr[i]:self.indptr[i + 1]]]) for j, i in enumerate(idx)], dim=1),
+                     # Important: torch.sparse requires long, but we used int
+                     self.indices[self.indptr[i]:self.indptr[i + 1]].long()]) for j, i in enumerate(idx)], dim=1),
       torch.cat([self.data[self.indptr[i]:self.indptr[i + 1]] for i in idx]),
       size=[len(idx), self.shape[1]]).to_dense().squeeze()
 
