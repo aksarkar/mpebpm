@@ -21,7 +21,8 @@ def _simulate_gamma():
 
 @pytest.fixture
 def simulate_gamma():
-  return _simulate_gamma()
+  x, s, log_mu, log_phi, llik = _simulate_gamma()
+  return x, s, log_mu, log_phi, -llik
 
 @pytest.fixture
 def simulate_point_gamma():
@@ -34,7 +35,7 @@ def simulate_point_gamma():
   F = st.nbinom(n=np.exp(-log_phi), p=1 / (1 + s.dot(np.exp(log_mu + log_phi))))
   llik_nonzero = np.log(1 - pi0) + F.logpmf(y)
   llik = np.where(y < 1, np.log(pi0 + np.exp(llik_nonzero)), llik_nonzero).sum()
-  return y, s, log_mu, log_phi, logodds, llik
+  return y, s, log_mu, log_phi, logodds, -llik
 
 @pytest.fixture
 def csr_matrix():
