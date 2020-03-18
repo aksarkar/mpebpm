@@ -31,7 +31,8 @@ class CSRTensor:
     """
     return torch.sparse.FloatTensor(
       torch.cat([
-        torch.stack([torch.full(((self.indptr[i + 1] - self.indptr[i]).item(),), j, dtype=torch.long),
+        torch.stack([torch.full(((self.indptr[i + 1] - self.indptr[i]).item(),), j,
+                                dtype=torch.long, device=self.data.device),
                      self.indices[self.indptr[i]:self.indptr[i + 1]]]) for j, i in enumerate(idx)], dim=1),
       torch.cat([self.data[self.indptr[i]:self.indptr[i + 1]] for i in idx]),
       size=[len(idx), self.shape[1]]).to_dense().squeeze()

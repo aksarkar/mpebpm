@@ -68,7 +68,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
   """Check x, s, onehot and return a DataLoader"""
   n, p = x.shape
   if s is None:
-    s = torch.tensor(x.sum(axis=1), dtype=torch.float)
+    s = torch.tensor(x.sum(axis=1).reshape(-1, 1), dtype=torch.float)
   elif s.shape != (n, 1):
     raise ValueError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
   elif not isinstance(s, torch.FloatTensor):
@@ -90,11 +90,18 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     if not ss.issparse(onehot):
       onehot = ss.csr_matrix(onehot)
     onehot = mpebpm.sparse.CSRTensor(onehot.data, onehot.indices, onehot.indptr, dtype=torch.float)
+  else:
+    # Important: don't use onehot = torch.ones(n) because this might be big
+    k = 1
+  if torch.cuda.is_available:
+    x = x.cuda()
+    s = s.cuda()
+    if onehot is not None:
+      onehot = onehot.cuda()
+  if onehot is not None:
     data = mpebpm.sparse.SparseDataset(x, s, onehot)
   else:
-    # Important: don't return onehot = torch.ones(n) because this might be big
     data = mpebpm.sparse.SparseDataset(x, s)
-    k = 1
   if init is None:
     pass
   elif init[0].shape != (k, p):
