@@ -118,7 +118,7 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     raise ValueError('max_epochs must be >= 1')
   return data, n, p, k
 
-def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_workers=0, verbose=False, trace=False):
+def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, num_workers=0, verbose=False):
   """SGD subroutine
 
   x - [n, p] tensor
@@ -133,12 +133,11 @@ def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, nu
   # The default value of this kwarg in td.DataLoader.__init__ has changed since
   # torch 0.4.1 (which we are using)
   collate_fn = getattr(data, 'collate_fn', td.dataloader.default_collate)
-  data = td.DataLoader(data, batch_size=batch_size, num_workers=num_workers,
+  data = td.DataLoader(data, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
                        # Important: only CPU memory can be pinned
                        pin_memory=not torch.cuda.is_available(),
                        collate_fn=collate_fn)
   opt = torch.optim.RMSprop(params, lr=lr)
-  param_trace = []
   loss = None
   for epoch in range(max_epochs):
     for batch in data:
@@ -154,9 +153,6 @@ def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, nu
         raise RuntimeError('nan loss')
       loss.backward()
       opt.step()
-      if trace:
-        # Important: this only works for scalar params
-        param_trace.append([p.item() for p in params] + [loss.item()])
     if verbose:
       print(f'Epoch {epoch}:', loss.item())
   if torch.cuda.is_available:
@@ -165,12 +161,9 @@ def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, nu
     result = [p.detach().numpy() for p in params]
   # Clean up GPU memory
   del params[:]
-  result.append(loss.item())
-  if trace:
-    result.append(param_trace)
   return result
 
-def ebpm_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
+def ebpm_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -193,10 +186,9 @@ distribution
     log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True, device=device)
     log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
   return _sgd(data, onehot=onehot, llik=_nb_llik, params=[log_mean, log_inv_disp],
-              lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose,
-              trace=trace)
+              lr=lr, batch_size=batch_size, max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
 
-def ebpm_point_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
+def ebpm_point_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -211,8 +203,7 @@ distribution
   if init is None:
     if verbose:
       print('Fitting ebpm_gamma to get initialization')
-    res = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose)
-    init = res[:-1]
+    init = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
@@ -223,4 +214,4 @@ distribution
   logodds = torch.full([k, p], -8, dtype=torch.float, requires_grad=True, device=device)
   return _sgd(data, onehot=onehot, llik=_zinb_llik, params=[log_mean, log_inv_disp, logodds],
               lr=lr, batch_size=batch_size, max_epochs=max_epochs,
-              verbose=verbose, trace=trace)
+              shuffle=shuffle, verbose=verbose)
