@@ -14,7 +14,7 @@ import scipy.sparse as ss
 import torch
 import torch.utils.data as td
 
-def _nb_llik(x, s, log_mean, log_inv_disp, onehot=None):
+def _nb_llik(x, s, log_mean, log_inv_disp, beta=None, onehot=None, design=None):
   """Return ln p(x_i | s_i, g)
 
   x_i ~ Poisson(s_i lambda_i)
@@ -34,6 +34,9 @@ def _nb_llik(x, s, log_mean, log_inv_disp, onehot=None):
     # This is OK for minibatches, but not for batch GD
     mean = s * torch.matmul(onehot, torch.exp(log_mean))
     inv_disp = torch.matmul(onehot, torch.exp(log_inv_disp))
+  if beta is not None:
+    assert design is not None
+    mean *= torch.exp(torch.matmul(design, beta))
   return (x * torch.log(mean / inv_disp)
           - x * torch.log(1 + mean / inv_disp)
           - inv_disp * torch.log(1 + mean / inv_disp)
@@ -42,7 +45,7 @@ def _nb_llik(x, s, log_mean, log_inv_disp, onehot=None):
           - torch.lgamma(inv_disp)
           - torch.lgamma(x + 1))
 
-def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, onehot=None):
+def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, beta=None, onehot=None, design=None):
   """Return ln p(x_i | s_i, g)
 
   x_i ~ Poisson(s_i lambda_i)
@@ -58,13 +61,13 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, onehot=None):
   """
   if onehot is not None:
     logodds = torch.matmul(onehot, logodds)
-  nb_llik = _nb_llik(x, s, log_mean, log_inv_disp, onehot=onehot)
+  nb_llik = _nb_llik(x, s, log_mean, log_inv_disp, beta=beta, onehot=onehot, design=design)
   softplus = torch.nn.functional.softplus
   case_zero = -softplus(-logodds) + softplus(nb_llik - logodds)
   case_non_zero = -softplus(logodds) + nb_llik
   return torch.where(torch.lt(x, 1), case_zero, case_non_zero)
 
-def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
+def _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs):
   """Check x, s, onehot and return a DataLoader"""
   n, p = x.shape
   if s is None:
@@ -93,15 +96,31 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
   else:
     # Important: don't use onehot = torch.ones(n) because this might be big
     k = 1
+  if design is not None:
+    if design.shape[0] != n:
+      raise ValueError(f'shape mismatch (onehot): expected ({n}, k), got {onehot.shape}')
+    m = design.shape[1]
+    if ss.issparse(design):
+      design = ss.csr_matrix(design)
+      design = mpebpm.sparse.CSRTensor(design.data, design.indices, design.indptr, design.shape, dtype=torch.float)
+    else:
+      design = torch.tensor(design, dtype=torch.float)
+  else:
+    # Important: don't use design = torch.zeros(n)
+    m = 0
   if torch.cuda.is_available:
     x = x.cuda()
     s = s.cuda()
     if onehot is not None:
       onehot = onehot.cuda()
+    if design is not None:
+      design = design.cuda()
+  tensors = [x, s]
   if onehot is not None:
-    data = mpebpm.sparse.SparseDataset(x, s, onehot)
-  else:
-    data = mpebpm.sparse.SparseDataset(x, s)
+    tensors.append(onehot)
+  if design is not None:
+    tensors.append(design)
+  data = mpebpm.sparse.SparseDataset(*tensors)
   if init is None:
     pass
   elif init[0].shape != (k, p):
@@ -116,9 +135,9 @@ def _check_args(x, s, onehot, init, lr, batch_size, max_epochs):
     raise ValueError('batch_size must be >= 1')
   if max_epochs < 1:
     raise ValueError('max_epochs must be >= 1')
-  return data, n, p, k
+  return data, n, p, k, m
 
-def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, num_workers=0, verbose=False):
+def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, num_workers=0, verbose=False):
   """SGD subroutine
 
   x - [n, p] tensor
@@ -142,13 +161,18 @@ def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, sh
   for epoch in range(max_epochs):
     for batch in data:
       opt.zero_grad()
-      # Important: params are assumed to be provided in the order assumed by llik
+      x = batch.pop(0)
+      s = batch.pop(0)
       if onehot is not None:
-        x, s, y = batch
-        loss = -llik(x, s, *params, onehot=y).sum()
+        l = batch.pop(0)
       else:
-        x, s = batch
-        loss = -llik(x, s, *params).sum()
+        l = None
+      if design is not None:
+        z = batch.pop(0)
+      else:
+        z = None
+      # Important: params are assumed to be provided in the order assumed by llik
+      loss = -llik(x, s, *params, onehot=l, design=z).sum()
       if torch.isnan(loss):
         raise RuntimeError('nan loss')
       loss.backward()
@@ -163,7 +187,7 @@ def _sgd(data, onehot, llik, params, lr=1e-2, batch_size=100, max_epochs=100, sh
   del params[:]
   return result
 
-def ebpm_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
+def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -174,7 +198,7 @@ distribution
   init - (log_mu, log_phi) [1, p]
 
   """
-  data, n, p, k = _check_args(x, s, onehot, init, lr, batch_size, max_epochs)
+  data, n, p, k, m = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
@@ -185,10 +209,15 @@ distribution
   else:
     log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True, device=device)
     log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
-  return _sgd(data, onehot=onehot, llik=_nb_llik, params=[log_mean, log_inv_disp],
-              lr=lr, batch_size=batch_size, max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
+  params = [log_mean, log_inv_disp]
+  if design is not None:
+    beta = torch.zeros([m, p], dtype=torch.float, requires_grad=True, device=device)
+    params.append(beta)
+  return _sgd(data, onehot=onehot, design=design, llik=_nb_llik,
+              params=params, lr=lr, batch_size=batch_size,
+              max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
 
-def ebpm_point_gamma(x, s=None, onehot=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
+def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -199,7 +228,7 @@ distribution
   init - (log_mu, -log_phi) [1, p]
 
   """
-  data, n, p, k = _check_args(x, s, onehot, init, lr, batch_size, max_epochs)
+  data, n, p, k, m = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs)
   if init is None:
     if verbose:
       print('Fitting ebpm_gamma to get initialization')
@@ -212,6 +241,11 @@ distribution
   log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
   # Important: start pi_j near zero (on the logit scale)
   logodds = torch.full([k, p], -8, dtype=torch.float, requires_grad=True, device=device)
-  return _sgd(data, onehot=onehot, llik=_zinb_llik, params=[log_mean, log_inv_disp, logodds],
-              lr=lr, batch_size=batch_size, max_epochs=max_epochs,
-              shuffle=shuffle, verbose=verbose)
+  params = [log_mean, log_inv_disp, logodds]
+  if design is not None:
+    # Do not warm start this
+    beta = torch.zeros([m, p], dtype=torch.float, requires_grad=True, device=device)
+    params.append(beta)
+  return _sgd(data, onehot=onehot, design=design, llik=_zinb_llik,
+              params=params, lr=lr, batch_size=batch_size,
+              max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)

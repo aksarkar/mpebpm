@@ -16,7 +16,7 @@ def test_CSRTensor(csr_matrix):
 
 def test_CSRTensor___getitem__(csr_matrix):
   x = csr_matrix
-  x0 = x[0].A.ravel()
+  x0 = x[0].A
   xt = mpebpm.sparse.CSRTensor(x.data, x.indices, x.indptr, x.shape)
   xt0 = xt[[0]].numpy()
   assert x0.shape == xt0.shape

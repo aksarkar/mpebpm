@@ -82,6 +82,56 @@ def test_ebpm_gamma_sgd(simulate_gamma):
   assert neg_log_phi_hat.shape == (1, p)
   assert l1 < l0
 
+def test_ebpm_gamma_batch_onehot(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  log_mu_hat, neg_log_phi_hat = mpebpm.sgd.ebpm_gamma(x, s, onehot=np.ones((n, 1)), batch_size=n, max_epochs=2000)
+  l1 = -st.nbinom(n=np.exp(neg_log_phi_hat), p=1 / (1 + s * np.exp(log_mu_hat - neg_log_phi_hat))).logpmf(x).sum()
+  assert np.isfinite(log_mu_hat).all()
+  assert np.isfinite(neg_log_phi_hat).all()
+  assert log_mu_hat.shape == (1, p)
+  assert neg_log_phi_hat.shape == (1, p)
+  assert l1 < l0
+
+def test_ebpm_gamma_batch_onehot_2(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  z = np.random.uniform(size=n) < 0.5
+  onehot = np.vstack((z, ~z)).T.astype(float)
+  log_mu_hat, neg_log_phi_hat = mpebpm.sgd.ebpm_gamma(x, s, onehot=onehot, batch_size=1, max_epochs=10, verbose=True)
+  l1 = -st.nbinom(n=onehot @ np.exp(neg_log_phi_hat), p=1 / (1 + s * onehot @ np.exp(log_mu_hat - neg_log_phi_hat))).logpmf(x).sum()
+  assert np.isfinite(log_mu_hat).all()
+  assert np.isfinite(neg_log_phi_hat).all()
+  assert log_mu_hat.shape == (2, p)
+  assert neg_log_phi_hat.shape == (2, p)
+  # TODO: this doesn't beat oracle log likelihood?
+
+def test_ebpm_gamma_batch_design(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  log_mu_hat, neg_log_phi_hat, beta_hat = mpebpm.sgd.ebpm_gamma(x, s, design=np.zeros((n, 1)), batch_size=1, max_epochs=20)
+  l1 = -st.nbinom(n=np.exp(neg_log_phi_hat), p=1 / (1 + s * np.exp(log_mu_hat - neg_log_phi_hat))).logpmf(x).sum()
+  assert np.isfinite(log_mu_hat).all()
+  assert np.isfinite(neg_log_phi_hat).all()
+  assert np.isfinite(beta_hat).all()
+  assert log_mu_hat.shape == (1, p)
+  assert neg_log_phi_hat.shape == (1, p)
+  assert beta_hat.shape == (1, p)
+  # TODO: this doesn't beat oracle log likelihood?
+
+def test_ebpm_gamma_batch_onehot_design(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  log_mu_hat, neg_log_phi_hat, beta_hat = mpebpm.sgd.ebpm_gamma(x, s, onehot=np.ones((n, 1)), design=np.zeros((n, 1)), batch_size=1, max_epochs=20)
+  l1 = -st.nbinom(n=np.exp(neg_log_phi_hat), p=1 / (1 + s * np.exp(log_mu_hat - neg_log_phi_hat))).logpmf(x).sum()
+  assert np.isfinite(log_mu_hat).all()
+  assert np.isfinite(neg_log_phi_hat).all()
+  assert np.isfinite(beta_hat).all()
+  assert log_mu_hat.shape == (1, p)
+  assert neg_log_phi_hat.shape == (1, p)
+  assert beta_hat.shape == (1, p)
+  # TODO: this doesn't beat oracle log likelihood?
+
 def test_ebpm_point_gamma_oracle_init(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma
   n, p = x.shape

@@ -37,7 +37,7 @@ class CSRTensor:
                      # Important: torch.sparse requires long, but we used int
                      self.indices[self.indptr[i]:self.indptr[i + 1]].long()]) for j, i in enumerate(idx)], dim=1),
       torch.cat([self.data[self.indptr[i]:self.indptr[i + 1]] for i in idx]),
-      size=[len(idx), self.shape[1]]).to_dense().squeeze()
+      size=[len(idx), self.shape[1]]).to_dense()
 
   def cuda(self):
     self.data = self.data.cuda()
