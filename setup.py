@@ -1,12 +1,10 @@
 import setuptools
 
-_name = 'mpebpm'
-
 setuptools.setup(
   name=_name,
   description='Massively Parallel Empirical Bayes Poisson Means',
-  version='0.1',
-  url=f'https://www.github.com/aksarkar/{_name}',
+  version='0.2',
+  url='https://www.github.com/aksarkar/mpebpm',
   author='Abhishek Sarkar',
   author_email='aksarkar@uchicago.edu',
   license='MIT',
