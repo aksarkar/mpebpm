@@ -16,6 +16,33 @@ import torch
 import torch.utils.data as td
 import torch.utils.tensorboard as tb
 
+def _pois_llik(x, s, log_mean, beta, design, onehot=None):
+  """Return ln p(x_i | s_i, g)
+
+  Assume a design matrix of covariates with effects beta to be
+  estimated. Without the design matrix, the MLE is analytic and we do not need
+  to use this as a subroutine.
+
+  x_i ~ Poisson(s_i lambda_i)
+  lambda_i ~ g = delta_0(lambda_i - mu)
+
+  x - [n, p] tensor
+  s - [n, 1] tensor
+  log_mean - [k, p] tensor (default: k = 1)
+  log_inv_disp - [k, p] tensor (default: k = 1)
+  onehot - [n, k] tensor
+
+  """
+  if onehot is None:
+    mean = torch.matmul(s, torch.exp(log_mean))
+    inv_disp = torch.exp(log_inv_disp)
+  else:
+    # This is OK for minibatches, but not for batch GD
+    mean = s * torch.matmul(onehot, torch.exp(log_mean))
+    inv_disp = torch.matmul(onehot, torch.exp(log_inv_disp))
+  mean *= torch.exp(torch.matmul(design, beta))
+  return x * torch.log(mean) - mean - torch.lgamma(x + 1)
+
 def _nb_llik(x, s, log_mean, log_inv_disp, beta=None, onehot=None, design=None):
   """Return ln p(x_i | s_i, g)
 
@@ -198,23 +225,42 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, num_epochs
   del params[:]
   return result
 
-def ebpm_point(x, s=None, onehot=None):
+def ebpm_point(x, s=None, onehot=None, design=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
   """Return fitted parameters assuming g is a point mass
 
-  Arguments:
+  Note that if design is None, then the solution is analytic.
+
+  Parameters:
 
   x - array-like [n, p]
   s - array-like [n, 1]
   onehot - array-like [n, m]
+  design - array-like [n, q]
+  lr - learning rate
+  batch_size - number of data points for minibatch SGD
+  num_epochs - number of passes through the data
+  shuffle - randomly sample data points in each minibatch
+  log_dir - output directory for tensorboard
 
   Return:
 
-  log_mu - array [m, p]
+  log mu - array [m, p]
 
   """
-  # TODO: this is inelegant
-  _check_args(x, s, onehot, design=None, init=None, lr=0, batch_size=1, num_epochs=1, log_dir=None)
-  return np.log(onehot.T @ x) - np.log(onehot.T @ s)
+  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init=None, lr, batch_size, num_epochs, log_dir)
+  if design is None:
+    return np.log(onehot.T @ x) - np.log(onehot.T @ s)
+  else:
+    if torch.cuda.is_available():
+      device = 'cuda'
+    else:
+      device = 'cpu'
+    log_mean = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
+    beta = torch.zeros([m, p], dtype=torch.float, requires_grad=True, device=device)
+    params = [log_mean, beta]
+    return _sgd(data, onehot=onehot, design=design, llik=_pois_llik,
+                params=params, key='pois', lr=lr, batch_size=batch_size,
+                num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
 
 def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
   """Return fitted parameters assuming g is a Gamma distribution
