@@ -5,6 +5,20 @@ import scipy.special as sp
 import scipy.stats as st
 import torch
 
+@pytest.fixture
+def simulate_point():
+  n = 500
+  p = 10
+  np.random.seed(0)
+  # Typical values (Sarkar et al. PLoS Genet 2019)
+  log_mu = np.random.uniform(-12, -6, size=(1, p))
+  s = np.random.poisson(lam=1e5, size=(n, 1))
+  # Important: NB success probability is (n, p)
+  F = st.poisson(mu=s * np.exp(log_mu))
+  x = F.rvs()
+  llik = F.logpmf(x).sum()
+  return x, s, log_mu, -llik
+  
 def _simulate_gamma():
   n = 500
   p = 10

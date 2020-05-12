@@ -10,6 +10,7 @@ These implementations are specialized for two scenarios:
 
 """
 import mpebpm.sparse
+import numpy as np
 import os.path
 import scipy.sparse as ss
 import torch
@@ -35,11 +36,9 @@ def _pois_llik(x, s, log_mean, beta, design, onehot=None):
   """
   if onehot is None:
     mean = torch.matmul(s, torch.exp(log_mean))
-    inv_disp = torch.exp(log_inv_disp)
   else:
     # This is OK for minibatches, but not for batch GD
     mean = s * torch.matmul(onehot, torch.exp(log_mean))
-    inv_disp = torch.matmul(onehot, torch.exp(log_inv_disp))
   mean *= torch.exp(torch.matmul(design, beta))
   return x * torch.log(mean) - mean - torch.lgamma(x + 1)
 
@@ -137,7 +136,7 @@ def _check_args(x, s, onehot, design, init, lr, batch_size, num_epochs, log_dir)
   else:
     # Important: don't use design = torch.zeros(n)
     m = 0
-  if torch.cuda.is_available:
+  if torch.cuda.is_available():
     x = x.cuda()
     s = s.cuda()
     if onehot is not None:
@@ -247,9 +246,12 @@ def ebpm_point(x, s=None, onehot=None, design=None, lr=1e-2, batch_size=100, num
   log mu - array [m, p]
 
   """
-  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init=None, lr, batch_size, num_epochs, log_dir)
+  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, None, lr, batch_size, num_epochs, log_dir)
   if design is None:
-    return np.log(onehot.T @ x) - np.log(onehot.T @ s)
+    if onehot is None:
+      return np.log(x.sum(axis=0, keepdims=True)) - np.log(s.sum())
+    else:
+      return np.log(onehot.T @ x) - np.log(onehot.T @ s)
   else:
     if torch.cuda.is_available():
       device = 'cuda'
