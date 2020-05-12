@@ -10,9 +10,11 @@ These implementations are specialized for two scenarios:
 
 """
 import mpebpm.sparse
+import os.path
 import scipy.sparse as ss
 import torch
 import torch.utils.data as td
+import torch.utils.tensorboard as tb
 
 def _nb_llik(x, s, log_mean, log_inv_disp, beta=None, onehot=None, design=None):
   """Return ln p(x_i | s_i, g)
@@ -67,7 +69,7 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, beta=None, onehot=None, de
   case_non_zero = -softplus(logodds) + nb_llik
   return torch.where(torch.lt(x, 1), case_zero, case_non_zero)
 
-def _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs):
+def _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir):
   """Check x, s, onehot and return a DataLoader"""
   n, p = x.shape
   if s is None:
@@ -135,9 +137,11 @@ def _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs):
     raise ValueError('batch_size must be >= 1')
   if max_epochs < 1:
     raise ValueError('max_epochs must be >= 1')
-  return data, n, p, k, m
+  if log_dir is not None and not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+  return data, n, p, k, m, log_dir
 
-def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, num_workers=0, verbose=False):
+def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, num_workers=0, log_dir=None, key=None):
   """SGD subroutine
 
   x - [n, p] tensor
@@ -146,6 +150,8 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs
   params - list of tensor [1, p]
 
   """
+  if log_dir is not None:
+    writer = tb.SummaryWriter(log_dir=log_dir)
   # Important: this is required for EBPMDataset, but TensorDataset does not
   # define collate_fn.
   #
@@ -156,6 +162,7 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs
                        # Important: only CPU memory can be pinned
                        pin_memory=not torch.cuda.is_available(),
                        collate_fn=collate_fn)
+  global_step = 0
   opt = torch.optim.RMSprop(params, lr=lr)
   loss = None
   for epoch in range(max_epochs):
@@ -175,19 +182,21 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs
       loss = -llik(x, s, *params, onehot=l, design=z).sum()
       if torch.isnan(loss):
         raise RuntimeError('nan loss')
+      if log_dir is not None:
+        writer.add_scalar(f'loss/{key}', loss, global_step)
+      global_step += 1
       loss.backward()
       opt.step()
-    if verbose:
-      print(f'Epoch {epoch}:', loss.item())
   if torch.cuda.is_available:
     result = [p.cpu().detach().numpy() for p in params]
   else:
     result = [p.detach().numpy() for p in params]
   # Clean up GPU memory
+  del data
   del params[:]
   return result
 
-def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
+def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, log_dir=None):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -198,7 +207,7 @@ distribution
   init - (log_mu, log_phi) [1, p]
 
   """
-  data, n, p, k, m = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs)
+  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
@@ -214,10 +223,10 @@ distribution
     beta = torch.zeros([m, p], dtype=torch.float, requires_grad=True, device=device)
     params.append(beta)
   return _sgd(data, onehot=onehot, design=design, llik=_nb_llik,
-              params=params, lr=lr, batch_size=batch_size,
-              max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
+              params=params, key='gamma', lr=lr, batch_size=batch_size,
+              max_epochs=max_epochs, shuffle=shuffle, log_dir=log_dir)
 
-def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, verbose=False):
+def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, log_dir=None):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -228,11 +237,9 @@ distribution
   init - (log_mu, -log_phi) [1, p]
 
   """
-  data, n, p, k, m = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs)
+  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir)
   if init is None:
-    if verbose:
-      print('Fitting ebpm_gamma to get initialization')
-    init = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
+    init = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, max_epochs=max_epochs, shuffle=shuffle, log_dir=log_dir)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
@@ -247,5 +254,5 @@ distribution
     beta = torch.zeros([m, p], dtype=torch.float, requires_grad=True, device=device)
     params.append(beta)
   return _sgd(data, onehot=onehot, design=design, llik=_zinb_llik,
-              params=params, lr=lr, batch_size=batch_size,
-              max_epochs=max_epochs, shuffle=shuffle, verbose=verbose)
+              params=params, key='point_gamma', lr=lr, batch_size=batch_size,
+              max_epochs=max_epochs, shuffle=shuffle, log_dir=log_dir)
