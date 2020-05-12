@@ -69,8 +69,8 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds, beta=None, onehot=None, de
   case_non_zero = -softplus(logodds) + nb_llik
   return torch.where(torch.lt(x, 1), case_zero, case_non_zero)
 
-def _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir):
-  """Check x, s, onehot and return a DataLoader"""
+def _check_args(x, s, onehot, design, init, lr, batch_size, num_epochs, log_dir):
+  """Check input dimensions and learning parameters, and return a DataLoader"""
   n, p = x.shape
   if s is None:
     s = torch.tensor(x.sum(axis=1).reshape(-1, 1), dtype=torch.float)
@@ -130,18 +130,18 @@ def _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir)
   elif init[1].shape != (k, p):
     raise ValueError(f'shape mismatch (log_phi): expected {(k, p)}, got {init[1].shape}')
   elif len(init) > 2:
-    raise ValueError('expected two values in init, got {len(init)}')
+    raise ValueError(f'expected two values in init, got {len(init)}')
   if lr <= 0:
     raise ValueError('lr must be >= 0')
   if batch_size < 1:
     raise ValueError('batch_size must be >= 1')
-  if max_epochs < 1:
-    raise ValueError('max_epochs must be >= 1')
+  if num_epochs < 1:
+    raise ValueError('num_epochs must be >= 1')
   if log_dir is not None and not os.path.exists(log_dir):
     os.makedirs(log_dir)
   return data, n, p, k, m, log_dir
 
-def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, num_workers=0, log_dir=None, key=None):
+def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, num_workers=0, log_dir=None, key=None):
   """SGD subroutine
 
   x - [n, p] tensor
@@ -165,7 +165,7 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs
   global_step = 0
   opt = torch.optim.RMSprop(params, lr=lr)
   loss = None
-  for epoch in range(max_epochs):
+  for epoch in range(num_epochs):
     for batch in data:
       opt.zero_grad()
       x = batch.pop(0)
@@ -184,6 +184,8 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs
         raise RuntimeError('nan loss')
       if log_dir is not None:
         writer.add_scalar(f'loss/{key}', loss, global_step)
+        for k, v in zip(['log_mu', 'log_phi', 'logodds'], params):
+          writer.add_scalar(f'params/{k}_norm', torch.norm(v), global_step)
       global_step += 1
       loss.backward()
       opt.step()
@@ -196,18 +198,47 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, max_epochs
   del params[:]
   return result
 
-def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, log_dir=None):
-  """Return fitted parameters and marginal log likelihood assuming g is a Gamma
-distribution
+def ebpm_point(x, s=None, onehot=None):
+  """Return fitted parameters assuming g is a point mass
 
-  Important: returns log mu and -log phi
+  Arguments:
 
   x - array-like [n, p]
   s - array-like [n, 1]
-  init - (log_mu, log_phi) [1, p]
+  onehot - array-like [n, m]
+
+  Return:
+
+  log_mu - array [m, p]
 
   """
-  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir)
+  # TODO: this is inelegant
+  _check_args(x, s, onehot, design=None, init=None, lr=0, batch_size=1, num_epochs=1, log_dir=None)
+  return np.log(onehot.T @ x) - np.log(onehot.T @ s)
+
+def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
+  """Return fitted parameters assuming g is a Gamma distribution
+
+  Parameters:
+
+  x - array-like [n, p]
+  s - array-like [n, 1]
+  onehot - array-like [n, m]
+  design - array-like [n, q]
+  init - (log_mu, log_phi) [1, p]
+  lr - learning rate
+  batch_size - number of data points for minibatch SGD
+  num_epochs - number of passes through the data
+  shuffle - randomly sample data points in each minibatch
+  log_dir - output directory for tensorboard
+
+  Return:
+
+  log mu - array [m, p]
+  neg_log phi - array[m, p]
+
+  """
+  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, num_epochs, log_dir)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
@@ -224,29 +255,42 @@ distribution
     params.append(beta)
   return _sgd(data, onehot=onehot, design=design, llik=_nb_llik,
               params=params, key='gamma', lr=lr, batch_size=batch_size,
-              max_epochs=max_epochs, shuffle=shuffle, log_dir=log_dir)
+              num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
 
-def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, shuffle=False, log_dir=None):
-  """Return fitted parameters and marginal log likelihood assuming g is a Gamma
-distribution
+def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
+  """Return fitted parameters assuming g is a point-Gamma distribution
 
-  Important: returns log mu, -log phi, logit pi
+
+  Parameters:
 
   x - array-like [n, p]
   s - array-like [n, 1]
-  init - (log_mu, -log_phi) [1, p]
+  onehot - array-like [n, m]
+  design - array-like [n, q]
+  init - (log_mu, log_phi) [1, p]
+  lr - learning rate
+  batch_size - number of data points for minibatch SGD
+  num_epochs - number of passes through the data
+  shuffle - randomly sample data points in each minibatch
+  log_dir - output directory for tensorboard
+
+  Return:
+
+  log mu - array [m, p]
+  neg_log phi - array[m, p]
+  logit_pi - array[m, p]
 
   """
-  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, max_epochs, log_dir)
+  data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, num_epochs, log_dir)
   if init is None:
-    init = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, max_epochs=max_epochs, shuffle=shuffle, log_dir=log_dir)
+    init = ebpm_gamma(x, s, onehot=onehot, lr=lr, batch_size=batch_size, num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
   if torch.cuda.is_available():
     device = 'cuda'
   else:
     device = 'cpu'
   log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True, device=device)
   log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
-  # Important: start pi_j near zero (on the logit scale)
+  # Important: start pi_j near zero
   logodds = torch.full([k, p], -8, dtype=torch.float, requires_grad=True, device=device)
   params = [log_mean, log_inv_disp, logodds]
   if design is not None:
@@ -255,4 +299,4 @@ distribution
     params.append(beta)
   return _sgd(data, onehot=onehot, design=design, llik=_zinb_llik,
               params=params, key='point_gamma', lr=lr, batch_size=batch_size,
-              max_epochs=max_epochs, shuffle=shuffle, log_dir=log_dir)
+              num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
