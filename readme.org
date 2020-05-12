@@ -14,7 +14,7 @@
   2020]]).
 
   This implementation readily supports fitting the model for data on the order
-  of 10^6 cells and 10^4 genes in parallel. It also supports fitting multiple
+  of 10⁶ cells and 10⁴ genes in parallel. It also supports fitting multiple
   EBPM problems per gene in parallel, as arise when e.g., cells have been
   assigned to groups (clusters). For example, we have used the method to solve
   537,678 EBPM problems (54 conditions by 9,957 genes) in parallel in a few
