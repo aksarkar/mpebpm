@@ -1,22 +1,25 @@
 * Massively Parallel Empirical Bayes Poisson Means 
 
   This package provides GPU-accelerated inference for the /Empirical Bayes
-  Poisson Means/ problem:
+  Poisson Means/ (EBPM) problem:
 
   #+BEGIN_EXAMPLE
     x_ij | s_i lambda_ij ~ Poisson(s_i lambda_ij)
     lambda_ij ~ g_j(lambda_ij)
   #+END_EXAMPLE
 
-  The implementation readily supports fitting this model for data on the order
-  of 10^6 cells and 10^4 genes in parallel. It also supports fitting a
-  specialized factor model where binary, fixed loadings assign cells to groups
-  and groups have different prior distributions (Sarkar et al. 2019):
+  This model can be used to model variation in scRNA-seq data due to
+  measurement error, as well as variation in true gene expression values
+  ([[https://dx.doi.org/10.1101/2020.04.07.030007][Sarkar and Stephens
+  2020]]).
 
-  #+BEGIN_EXAMPLE
-    lambda_ij ~ (L F')_ij
-    f_jk ~ g_jk(f_jk)
-  #+END_EXAMPLE
+  This implementation readily supports fitting the model for data on the order
+  of 10^6 cells and 10^4 genes in parallel. It also supports fitting multiple
+  EBPM problems per gene in parallel, as arise when e.g., cells have been
+  assigned to groups (clusters). For example, we have used the method to solve
+  537,678 EBPM problems (54 conditions by 9,957 genes) in parallel in a few
+  minutes ([[https://dx.doi.org/10.1371/journal.pgen.1008045][Sarkar et
+  al. 2019]]).
 
 ** Installation
 
