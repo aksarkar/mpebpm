@@ -211,7 +211,7 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, num_epochs
       if log_dir is not None:
         writer.add_scalar(f'loss/{key}', loss, global_step)
         for k, v in zip(['log_mu', 'log_phi', 'logodds'], params):
-          writer.add_scalar(f'params/{k}_norm', torch.norm(v), global_step)
+          writer.add_scalar(f'params/{key}/{k}_norm', torch.norm(v), global_step)
       global_step += 1
       loss.backward()
       opt.step()
