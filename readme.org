@@ -17,9 +17,9 @@
   of 10⁶ cells and 10⁴ genes in parallel. It also supports fitting multiple
   EBPM problems per gene in parallel, as arise when e.g., cells have been
   assigned to groups (clusters). For example, we have used the method to solve
-  537,678 EBPM problems (54 conditions by 9,957 genes) in parallel in a few
-  minutes ([[https://dx.doi.org/10.1371/journal.pgen.1008045][Sarkar et
-  al. 2019]]).
+  537,678 EBPM problems (5,597 cells from 54 conditions, at 9,957 genes) in
+  parallel in a few minutes
+  ([[https://dx.doi.org/10.1371/journal.pgen.1008045][Sarkar et al. 2019]]).
 
 ** Installation
 
