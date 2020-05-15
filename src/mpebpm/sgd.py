@@ -190,7 +190,6 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, num_epochs
                        collate_fn=collate_fn)
   global_step = 0
   opt = torch.optim.RMSprop(params, lr=lr)
-  loss = None
   for epoch in range(num_epochs):
     for batch in data:
       opt.zero_grad()
