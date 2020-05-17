@@ -80,12 +80,6 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
         l = torch.nn.functional.binary_cross_entropy(z, y)
     if writer is not None and y is not None:
       writer.add_scalar(f'loss/cross_entropy', l, t)
-    if update > loss:
-      raise RuntimeError('loss increased after E step')
-    elif loss - update < tol:
-      break
-  else:
-    raise RuntimeError(f'failed to converge in max_em_iters ({max_em_iters}) iterations')
   params.append(z)
   if torch.cuda.is_available:
     result = [p.detach().cpu().numpy() for p in params]
