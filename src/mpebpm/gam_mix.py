@@ -32,10 +32,10 @@ def _nb_mix_llik(x, s, log_mean, log_inv_disp):
        - torch.lgamma(x + 1))
   return L.sum(dim=2)
 
-def _nb_mix_loss(z, x, s, log_mean, log_inv_disp, eps=1e-16):
+def _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp, eps=1e-16):
   L = _nb_mix_llik(x, s, log_mean, log_inv_disp)
-  m, _ = L.max(dim=1, keepdim=True)
-  return -(m + torch.log(z * torch.exp(L - m) + eps)).sum()
+  # TODO: fixed uniform prior
+  return -(z * (L - torch.log(k))).mean()
 
 def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, shuffle=False, num_workers=0, log_dir=None):
   data, n, p, _, _, log_dir = mpebpm.sgd._check_args(x, s, None, None, None, lr, x.shape[0], num_epochs, log_dir)
@@ -52,19 +52,23 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
   else:
     device = 'cpu:0'
   z = torch.rand([n, k], dtype=torch.float, requires_grad=False, device=device)
-  log_mean = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
+  z /= z.sum(dim=1, keepdim=True)
+  log_mean = torch.log(torch.matmul(z.T, torch.tensor(x, dtype=torch.float).cuda())) - torch.log(torch.matmul(z.T, torch.tensor(s, dtype=torch.float).cuda()))
+  log_mean.requires_grad = True
   log_inv_disp = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
+  k = torch.tensor(k, dtype=torch.float, requires_grad=False, device=device)
   params = [log_mean, log_inv_disp]
 
   if log_dir is not None:
     writer = tb.SummaryWriter(log_dir=log_dir)
-  opt = torch.optim.RMSprop(params, lr=lr)
   global_step = 0
   for t in range(max_em_iters):
+    # Important: this needs to restart after each E step
+    opt = torch.optim.RMSprop(params, lr=lr)
     for _ in range(num_epochs):
       for x, s in data:
         opt.zero_grad()
-        loss = _nb_mix_loss(z, x, s, log_mean, log_inv_disp)
+        loss = _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp)
         if torch.isnan(loss):
           raise RuntimeError('nan loss')
         loss.backward(retain_graph=True)
@@ -75,11 +79,13 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
     L = _nb_mix_llik(x, s, log_mean, log_inv_disp)
     z = torch.nn.functional.softmax(L, dim=1)
     with torch.no_grad():
-      update = _nb_mix_loss(z, x, s, log_mean, log_inv_disp)
+      update = _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp)
+      assert update <= loss
       if y is not None:
-        l = torch.nn.functional.binary_cross_entropy(z, y)
-    if writer is not None and y is not None:
-      writer.add_scalar(f'loss/cross_entropy', l, t)
+        l = torch.min(torch.nn.functional.binary_cross_entropy(z, y),
+                      torch.nn.functional.binary_cross_entropy(1 - z, y))
+        if log_dir is not None:
+          writer.add_scalar(f'loss/cross_entropy', l, t)
   params.append(z)
   if torch.cuda.is_available:
     result = [p.detach().cpu().numpy() for p in params]
