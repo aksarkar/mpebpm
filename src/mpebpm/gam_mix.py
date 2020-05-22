@@ -71,17 +71,16 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
         loss = _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp)
         if torch.isnan(loss):
           raise RuntimeError('nan loss')
-        loss.backward(retain_graph=True)
+        loss.backward()
         opt.step()
         if log_dir is not None:
           writer.add_scalar(f'loss/nll', loss, global_step)
         global_step += 1
-    L = _nb_mix_llik(x, s, log_mean, log_inv_disp)
-    z = torch.nn.functional.softmax(L, dim=1)
     with torch.no_grad():
+      L = _nb_mix_llik(x, s, log_mean, log_inv_disp)
+      z = torch.nn.functional.softmax(L, dim=1)
       update = _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp)
-      assert update <= loss
-      if y is not None:
+      if y is not None and k == 2:
         l = torch.min(torch.nn.functional.binary_cross_entropy(z, y),
                       torch.nn.functional.binary_cross_entropy(1 - z, y))
         if log_dir is not None:
