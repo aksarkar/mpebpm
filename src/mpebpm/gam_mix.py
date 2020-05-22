@@ -126,7 +126,7 @@ class EBPMGammaMix(torch.nn.Module):
   def forward(self, x):
     return self.encoder(x)
 
-  def fit(self, x, s, y=None, lr=1e-2, batch_size=100, num_pretrain=50, num_epochs=100, shuffle=False, num_workers=0, log_dir=None):
+  def fit(self, x, s, y=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, num_workers=0, log_dir=None):
     """Fit the model
 
     x - array-like [n, p]
@@ -148,12 +148,6 @@ class EBPMGammaMix(torch.nn.Module):
     opt = torch.optim.RMSprop(self.parameters(), lr=lr)
     global_step = 0
     for t in range(num_epochs):
-      if t < num_pretrain:
-        self.log_mean.requires_grad = False
-        self.log_inv_disp.requires_grad = False
-      else:
-        self.log_mean.requires_grad = True
-        self.log_inv_disp.requires_grad = True
       for batch in data:
         x = batch.pop(0)
         s = batch.pop(0)
@@ -162,10 +156,12 @@ class EBPMGammaMix(torch.nn.Module):
         else:
           y = None
         opt.zero_grad()
+        # Important: these are all [n, k]
         z = self.encoder.forward(x)
-        err = -_nb_mix_loss(z, x, s, self.log_mean, self.log_inv_disp)
-        kl = (z * (torch.log(z + 1e-16) + torch.log(self.k))).sum()
-        elbo = err - kl
+        L = _nb_mix_llik(x, s, self.log_mean, self.log_inv_disp)
+        err = z * L
+        kl = z * (torch.log(z + 1e-16) + torch.log(self.k))
+        elbo = (err - kl).mean()
         loss = -elbo
         loss.retain_grad()
         if torch.isnan(loss):
@@ -173,8 +169,8 @@ class EBPMGammaMix(torch.nn.Module):
         loss.backward()
         opt.step()
         if log_dir is not None:
-          writer.add_scalar(f'loss/err', err, global_step)
-          writer.add_scalar(f'loss/kl', kl, global_step)
+          writer.add_scalar(f'loss/err', err.mean(), global_step)
+          writer.add_scalar(f'loss/kl', kl.mean(), global_step)
           writer.add_scalar(f'loss/elbo', elbo, global_step)
           with torch.no_grad():
             lz = torch.nn.functional.binary_cross_entropy(z, y)
