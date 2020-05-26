@@ -32,12 +32,12 @@ def _nb_mix_llik(x, s, log_mean, log_inv_disp):
        - torch.lgamma(x + 1))
   return L.sum(dim=2)
 
-def _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp, eps=1e-16):
+def _nb_mix_loss(z, x, s, pi, log_mean, log_inv_disp, eps=1e-16):
   L = _nb_mix_llik(x, s, log_mean, log_inv_disp)
   # TODO: fixed uniform prior
-  return -(z * (L - torch.log(k))).mean()
+  return -(z * (L - torch.log(pi))).mean()
 
-def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, shuffle=False, num_workers=0, log_dir=None):
+def ebpm_gam_mix_em(x, s, k, y=None, pi=None, lr=1e-2, num_epochs=100, max_em_iters=10, shuffle=False, num_workers=0, log_dir=None):
   data, n, p, _, _, log_dir = mpebpm.sgd._check_args(x, s, None, None, None, lr, x.shape[0], num_epochs, log_dir)
   collate_fn = getattr(data, 'collate_fn', td.dataloader.default_collate)
   # TODO: very hard to do minibatch SGD in this scheme, since we need to batch
@@ -53,10 +53,13 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
     device = 'cpu:0'
   z = torch.rand([n, k], dtype=torch.float, requires_grad=False, device=device)
   z /= z.sum(dim=1, keepdim=True)
-  log_mean = torch.log(torch.matmul(z.T, torch.tensor(x, dtype=torch.float).cuda())) - torch.log(torch.matmul(z.T, torch.tensor(s, dtype=torch.float).cuda()))
+  log_mean = torch.log1p(torch.matmul(z.T, torch.tensor(x, dtype=torch.float).cuda())) - torch.log(torch.matmul(z.T, torch.tensor(s, dtype=torch.float).cuda()))
   log_mean.requires_grad = True
   log_inv_disp = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
-  k = torch.tensor(k, dtype=torch.float, requires_grad=False, device=device)
+  if pi is None:
+    pi = torch.new_full([k, 1], 1 / k, device=device)
+  else:
+    pi = torch.tensor(pi, dtype=torch.float, device=device)
   params = [log_mean, log_inv_disp]
 
   if log_dir is not None:
@@ -68,7 +71,7 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
     for _ in range(num_epochs):
       for x, s in data:
         opt.zero_grad()
-        loss = _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp)
+        loss = _nb_mix_loss(z, x, s, pi, log_mean, log_inv_disp)
         if torch.isnan(loss):
           raise RuntimeError('nan loss')
         loss.backward()
@@ -79,7 +82,7 @@ def ebpm_gam_mix_em(x, s, k, y=None, lr=1e-2, num_epochs=100, max_em_iters=10, s
     with torch.no_grad():
       L = _nb_mix_llik(x, s, log_mean, log_inv_disp)
       z = torch.nn.functional.softmax(L, dim=1)
-      update = _nb_mix_loss(z, x, s, k, log_mean, log_inv_disp)
+      update = _nb_mix_loss(z, x, s, pi, log_mean, log_inv_disp)
       if y is not None and k == 2:
         l = torch.min(torch.nn.functional.binary_cross_entropy(z, y),
                       torch.nn.functional.binary_cross_entropy(1 - z, y))
