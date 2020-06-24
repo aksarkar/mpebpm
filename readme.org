@@ -4,8 +4,8 @@
   Poisson Means/ (EBPM) problem:
 
   #+BEGIN_EXAMPLE
-    x_ij | s_i lambda_ij ~ Poisson(s_i lambda_ij)
-    lambda_ij ~ g_j(lambda_ij)
+    x_ij | s_i λ_ij ~ Poisson(s_i λ_ij)
+    λ_ij ~ g_j(λ_ij)
   #+END_EXAMPLE
 
   This model can be used to model variation in scRNA-seq data due to
