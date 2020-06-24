@@ -8,7 +8,7 @@ setuptools.setup(
   author='Abhishek Sarkar',
   author_email='aksarkar@uchicago.edu',
   license='MIT',
-  install_requires=['numpy', 'scipy', 'torch'],
+  install_requires=['future', 'numpy', 'scipy', 'torch'],
   packages=setuptools.find_packages('src'),
   package_dir={'': 'src'},
   tests_require=['pytest'],
