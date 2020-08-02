@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Massively Parallel Empirical Bayes Poisson Means &#8212; mpebpm 0.2 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API reference" href="mpebpm.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="massively-parallel-empirical-bayes-poisson-means">
+<h1>Massively Parallel Empirical Bayes Poisson Means<a class="headerlink" href="#massively-parallel-empirical-bayes-poisson-means" title="Permalink to this headline">¶</a></h1>
+<p>This package provides GPU-accelerated inference for the <em>Empirical Bayes
+Poisson Means</em> (EBPM) problem:</p>
+<div class="math notranslate nohighlight">
+\[\]</div>
+<p>\begin{align}
+x_{ij} \mid s_{i}, \lambda_{ij} &amp;\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+\lambda_{ij} &amp;\sim g_j(\lambda_{ij})
+\end{align}</p>
+<p>This model can be used to explicitly separate and model variation in scRNA-seq
+data due to measurement error and variation in true gene expression values
+<a class="reference internal" href="references.html#sarkar2020" id="id1"><span>[Sarkar2020]</span></a>.</p>
+<p>This implementation readily supports fitting the model for data on the order of
+10⁶ cells and 10⁴ genes in parallel. It also supports fitting multiple EBPM
+problems per gene in parallel, as arise when e.g., cells have been assigned to
+groups (clusters). For example, we have <a class="reference external" href="https://aksarkar.github.io/singlecell-ideas/mpebpm.html">used the method</a> to solve 537,678
+EBPM problems (5,597 cells from 54 conditions, at 9,957 genes) in parallel in a
+few minutes <a class="reference internal" href="references.html#sarkar2019" id="id2"><span>[Sarkar2019]</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mpebpm.html">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mpebpm.html#module-mpebpm.sgd">mpebpm.sgd module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mpebpm.html#module-mpebpm.sparse">mpebpm.sparse module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">mpebpm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mpebpm.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="mpebpm.html" title="next chapter">API reference</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

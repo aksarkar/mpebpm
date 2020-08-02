@@ -7,6 +7,7 @@ extensions = [
   'sphinx.ext.autodoc',
   'sphinx.ext.githubpages',
   'sphinx.ext.mathjax',
+  'sphinx.ext.napoleon',
 ]
 
 html_show_sourcelink = False

@@ -1,0 +1,274 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API reference &#8212; mpebpm 0.2 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="References" href="references.html" />
+    <link rel="prev" title="Massively Parallel Empirical Bayes Poisson Means" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="api-reference">
+<h1>API reference<a class="headerlink" href="#api-reference" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-mpebpm.sgd">
+<span id="mpebpm-sgd-module"></span><h2>mpebpm.sgd module<a class="headerlink" href="#module-mpebpm.sgd" title="Permalink to this headline">¶</a></h2>
+<p>Empirical Bayes Poisson Means via SGD</p>
+<p>These implementations are specialized for two scenarios:</p>
+<ol class="arabic simple">
+<li><p>Fitting <span class="math notranslate nohighlight">\(p\)</span> EBPM problems on <span class="math notranslate nohighlight">\(n\)</span> samples in parallel, where
+<span class="math notranslate nohighlight">\(n, p\)</span> may be large</p></li>
+<li><p>Fitting <span class="math notranslate nohighlight">\(p \times k\)</span> EBPM problems in parallel, where the <span class="math notranslate nohighlight">\(n\)</span>
+samples are assumed to be drawn from a discrete (known) choice of k
+different priors (for each gene)</p></li>
+</ol>
+<dl class="py function">
+<dt id="mpebpm.sgd.ebpm_gamma">
+<code class="sig-prename descclassname">mpebpm.sgd.</code><code class="sig-name descname">ebpm_gamma</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">s</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">onehot</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">design</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">init</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">lr</span><span class="o">=</span><span class="default_value">0.01</span></em>, <em class="sig-param"><span class="n">batch_size</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">num_epochs</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">shuffle</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">log_dir</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sgd.ebpm_gamma" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return fitted parameters for a point mass expression model for each column
+of <code class="docutils literal notranslate"><span class="pre">x</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">p]</span></code>) – observed counts</p></li>
+<li><p><strong>s</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>, optional) – size factors</p></li>
+<li><p><strong>onehot</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">m]</span></code>, optional) – mapping of samples to conditions</p></li>
+<li><p><strong>design</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">q]</span></code>, optional) – design matrix of observed covariates</p></li>
+<li><p><strong>lr</strong> (<cite>float</cite>) – learning rate</p></li>
+<li><p><strong>batch_size</strong> (<cite>int</cite>) – number of data points for minibatch SGD</p></li>
+<li><p><strong>num_epochs</strong> (<cite>int</cite>) – number of passes through the data</p></li>
+<li><p><strong>shuffle</strong> (<cite>bool</cite>) – randomly sample data points in each minibatch</p></li>
+<li><p><strong>log_dir</strong> (<cite>str</cite>) – output directory for TensorBoard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Two arrays containing the log mean and log inverse dispersion parameters
+(<code class="docutils literal notranslate"><span class="pre">[m,</span> <span class="pre">p]</span></code>)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Marginally, the observed counts</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}x_{ij} \mid s_{i}, \lambda_{ij} &amp;\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+\lambda_{ij} &amp;\sim \operatorname{Gamma}(\phi_j^{-1}, \mu_j^{-1}\phi_j^{-1})\end{split}\]</div>
+<p>In this model, the Gamma distribution is parameterized by shape and rate,
+with mean <span class="math notranslate nohighlight">\(\mu_j\)</span> and variance <span class="math notranslate nohighlight">\(\mu_j^2\phi_j\)</span>. Marginally, the
+observed counts are negative binomial distributed with mean <span class="math notranslate nohighlight">\(\mu_j\)</span> and
+dispersion <span class="math notranslate nohighlight">\(\phi_j\)</span>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="mpebpm.sgd.ebpm_point">
+<code class="sig-prename descclassname">mpebpm.sgd.</code><code class="sig-name descname">ebpm_point</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">s</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">onehot</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">design</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">lr</span><span class="o">=</span><span class="default_value">0.01</span></em>, <em class="sig-param"><span class="n">batch_size</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">num_epochs</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">shuffle</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">log_dir</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sgd.ebpm_point" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns fitted parameters for a point mass expression model for each column
+of <code class="docutils literal notranslate"><span class="pre">x</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">p]</span></code>) – observed counts</p></li>
+<li><p><strong>s</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>, optional) – size factors</p></li>
+<li><p><strong>onehot</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">m]</span></code>, optional) – mapping of samples to conditions</p></li>
+<li><p><strong>design</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">q]</span></code>, optional) – design matrix of observed covariates</p></li>
+<li><p><strong>lr</strong> (<cite>float</cite>) – learning rate</p></li>
+<li><p><strong>batch_size</strong> (<cite>int</cite>) – number of data points for minibatch SGD</p></li>
+<li><p><strong>num_epochs</strong> (<cite>int</cite>) – number of passes through the data</p></li>
+<li><p><strong>shuffle</strong> (<cite>bool</cite>) – randomly sample data points in each minibatch</p></li>
+<li><p><strong>log_dir</strong> (<cite>str</cite>) – output directory for TensorBoard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>array containing log mean parameters (<code class="docutils literal notranslate"><span class="pre">[m,</span> <span class="pre">p]</span></code>)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Marginally, the observed counts</p>
+<blockquote>
+<div><div class="math notranslate nohighlight">
+\[x_{ij} \mid s_{i}, \mu_{j} \sim \operatorname{Poisson}(s_i \mu_j)\]</div>
+</div></blockquote>
+<p>If <code class="docutils literal notranslate"><span class="pre">design</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>, then the solution is analytic.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="mpebpm.sgd.ebpm_point_gamma">
+<code class="sig-prename descclassname">mpebpm.sgd.</code><code class="sig-name descname">ebpm_point_gamma</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">s</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">onehot</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">design</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">init</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">lr</span><span class="o">=</span><span class="default_value">0.01</span></em>, <em class="sig-param"><span class="n">batch_size</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">num_epochs</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">shuffle</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">log_dir</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sgd.ebpm_point_gamma" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return fitted parameters assuming for a point-Gamma expression model for
+each column of <code class="docutils literal notranslate"><span class="pre">x</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">p]</span></code>) – observed counts</p></li>
+<li><p><strong>s</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>, optional) – size factors</p></li>
+<li><p><strong>onehot</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">m]</span></code>, optional) – mapping of samples to conditions</p></li>
+<li><p><strong>design</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">q]</span></code>, optional) – design matrix of observed covariates</p></li>
+<li><p><strong>lr</strong> (<cite>float</cite>) – learning rate</p></li>
+<li><p><strong>batch_size</strong> (<cite>int</cite>) – number of data points for minibatch SGD</p></li>
+<li><p><strong>num_epochs</strong> (<cite>int</cite>) – number of passes through the data</p></li>
+<li><p><strong>shuffle</strong> (<cite>bool</cite>) – randomly sample data points in each minibatch</p></li>
+<li><p><strong>log_dir</strong> (<cite>str</cite>) – output directory for TensorBoard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Three arrays containing the log mean, log inverse dispersion, and logodds
+parameters (<code class="docutils literal notranslate"><span class="pre">[m,</span> <span class="pre">p]</span></code>)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Marginally, the observed counts</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}x_{ij} \mid s_{i}, \lambda_{ij} &amp;\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+\lambda_{ij} &amp;\sim \pi_j \delta_0(\cdot) + (1 - \pi_j)\operatorname{Gamma}(\phi_j^{-1}, \mu_j^{-1}\phi_j^{-1})\end{split}\]</div>
+<p>In this model, the Gamma distribution is parameterized by shape and rate,
+with mean <span class="math notranslate nohighlight">\(\mu_j\)</span> and variance <span class="math notranslate nohighlight">\(\mu_j^2\phi_j\)</span>. Marginally, the
+observed counts are zero-inflated negative binomial distributed, where the
+negative binomial component has mean <span class="math notranslate nohighlight">\(\mu_j\)</span> and dispersion
+<span class="math notranslate nohighlight">\(\phi_j\)</span>.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-mpebpm.sparse">
+<span id="mpebpm-sparse-module"></span><h2>mpebpm.sparse module<a class="headerlink" href="#module-mpebpm.sparse" title="Permalink to this headline">¶</a></h2>
+<p>Support for sparse tensors</p>
+<p>Our strategy for supporting sparse tensors is to implement CSR indexing and
+efficient slicing ourselves (not currently implemented in torch), and
+implementing a new DataSet type which can exploit this efficient slice.</p>
+<dl class="py class">
+<dt id="mpebpm.sparse.CSRTensor">
+<em class="property">class </em><code class="sig-prename descclassname">mpebpm.sparse.</code><code class="sig-name descname">CSRTensor</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">data</span></em>, <em class="sig-param"><span class="n">indices</span></em>, <em class="sig-param"><span class="n">indptr</span></em>, <em class="sig-param"><span class="n">shape</span></em>, <em class="sig-param"><span class="n">dtype</span><span class="o">=</span><span class="default_value">torch.float32</span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sparse.CSRTensor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Placeholder implementation of sparse 2-tensor in CSR format</p>
+<p>This implementation only supports extracting rows by a list of indices</p>
+<dl class="py method">
+<dt id="mpebpm.sparse.CSRTensor.cuda">
+<code class="sig-name descname">cuda</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sparse.CSRTensor.cuda" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="mpebpm.sparse.SparseDataset">
+<em class="property">class </em><code class="sig-prename descclassname">mpebpm.sparse.</code><code class="sig-name descname">SparseDataset</code><span class="sig-paren">(</span><em class="sig-param"><span class="o">*</span><span class="n">tensors</span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sparse.SparseDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.utils.data.dataset.Dataset</span></code></p>
+<p>Specialized dataset type for zipping sparse and dense tensors</p>
+<p class="rubric">Notes</p>
+<p><code class="docutils literal notranslate"><span class="pre">torch.utils.DataLoader.__next__()</span></code> calls:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collate_fn</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>This is too slow, so instead of actually returning the data, like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">indptr</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+<span class="n">end</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">indptr</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+<span class="k">return</span> <span class="p">(</span>
+  <span class="n">torch</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span>
+    <span class="c1"># Important: sparse indices are long in Torch</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">end</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="o">.</span><span class="n">device</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">indices</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]]),</span>
+    <span class="c1"># Important: this needs to be 1d before collate_fn</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">p</span><span class="p">])</span><span class="o">.</span><span class="n">to_dense</span><span class="p">()</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(),</span>
+  <span class="bp">self</span><span class="o">.</span><span class="n">s</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>and then concatenating in <code class="docutils literal notranslate"><span class="pre">collate_fn</span></code>, just return the index.</p>
+<dl class="py method">
+<dt id="mpebpm.sparse.SparseDataset.collate_fn">
+<code class="sig-name descname">collate_fn</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">indices</span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sparse.SparseDataset.collate_fn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a minibatch of items</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">mpebpm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.sgd">mpebpm.sgd module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.sparse">mpebpm.sparse module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Massively Parallel Empirical Bayes Poisson Means</a></li>
+      <li>Next: <a href="references.html" title="next chapter">References</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

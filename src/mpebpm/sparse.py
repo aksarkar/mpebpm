@@ -15,6 +15,7 @@ class CSRTensor:
 
   """
   def __init__(self, data, indices, indptr, shape, dtype=torch.float):
+    """Create a new CSR tensor"""
     self.data = torch.tensor(data, dtype=dtype)
     # Important: torch.sparse uses long for indices, but for our purposes int
     # is sufficient
@@ -26,8 +27,8 @@ class CSRTensor:
     """Return tensor containing rows idx
 
     Construct a sparse tensor using the CSR index, then convert to dense. This
-    is not a fully-featured __getitem__ (like numpy arrays or torch tensors),
-    and only supports iterable idx
+    is not a fully-featured ``__getitem__`` (like numpy arrays or torch
+    tensors), and only supports `iterable` ``idx``
 
     """
     return torch.sparse.FloatTensor(
@@ -48,24 +49,26 @@ class CSRTensor:
 class SparseDataset(td.Dataset):
   """Specialized dataset type for zipping sparse and dense tensors
 
-  torch.utils.DataLoader.__next__() calls:
+  Notes:
 
-  batch = self.collate_fn([self.dataset[i] for i in indices])
+    ``torch.utils.DataLoader.__next__()`` calls::
 
-  This is too slow, so instead of actually returning the data, like:
+      batch = self.collate_fn([self.dataset[i] for i in indices])
 
-  start = self.indptr[index]
-  end = self.indptr[index + 1]
-  return (
-    torch.sparse.FloatTensor(
-      # Important: sparse indices are long in Torch
-      torch.stack([torch.zeros(end - start, dtype=torch.long, device=self.indices.device), self.indices[start:end]]),
-      # Important: this needs to be 1d before collate_fn
-      self.data[start:end], size=[1, self.p]).to_dense().squeeze(),
-    self.s[index]
-  )
+    This is too slow, so instead of actually returning the data, like::
 
-  and then concatenating in collate_fn, just return the index.
+      start = self.indptr[index]
+      end = self.indptr[index + 1]
+      return (
+        torch.sparse.FloatTensor(
+          # Important: sparse indices are long in Torch
+          torch.stack([torch.zeros(end - start, dtype=torch.long, device=self.indices.device), self.indices[start:end]]),
+          # Important: this needs to be 1d before collate_fn
+          self.data[start:end], size=[1, self.p]).to_dense().squeeze(),
+        self.s[index]
+      )
+
+    and then concatenating in ``collate_fn``, just return the index.
 
   """
   def __init__(self, *tensors):
@@ -74,7 +77,7 @@ class SparseDataset(td.Dataset):
     self.n = min(t.shape[0] for t in self.tensors)
 
   def __getitem__(self, index):
-    """Dummy implementation of __getitem__"""
+    """Dummy implementation of ``__getitem__``"""
     return index
     
   def __len__(self):

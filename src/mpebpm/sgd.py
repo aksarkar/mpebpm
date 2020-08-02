@@ -1,12 +1,13 @@
-"""Empirical Bayes Poisson Means via SGD
+r"""Empirical Bayes Poisson Means via SGD
 
 These implementations are specialized for two scenarios:
 
-1. Fitting p EBPM problems on n samples in parallel, where n, p may be large
+1. Fitting :math:`p` EBPM problems on :math:`n` samples in parallel, where
+   :math:`n, p` may be large
 
-2. Fitting p * k EBPM problems in parallel, where the n samples are assumed to
-   be drawn from a discrete (known) choice of k different priors (for each
-   gene)
+2. Fitting :math:`p \times k` EBPM problems in parallel, where the :math:`n`
+   samples are assumed to be drawn from a discrete (known) choice of k
+   different priors (for each gene)
 
 """
 import mpebpm.sparse
@@ -224,25 +225,32 @@ def _sgd(data, onehot, design, llik, params, lr=1e-2, batch_size=100, num_epochs
   return result
 
 def ebpm_point(x, s=None, onehot=None, design=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
-  """Return fitted parameters assuming g is a point mass
+  r"""Returns fitted parameters for a point mass expression model for each column
+  of ``x``
 
-  Note that if design is None, then the solution is analytic.
+  Args:
 
-  Parameters:
+    x (array-like ``[n, p]``): observed counts
+    s (array-like ``[n, 1]``, optional): size factors 
+    onehot (array-like ``[n, m]``, optional): mapping of samples to conditions
+    design (array-like ``[n, q]``, optional): design matrix of observed covariates
+    lr (`float`): learning rate
+    batch_size (`int`): number of data points for minibatch SGD
+    num_epochs (`int`): number of passes through the data
+    shuffle (`bool`): randomly sample data points in each minibatch
+    log_dir (`str`): output directory for TensorBoard
 
-  x - array-like [n, p]
-  s - array-like [n, 1]
-  onehot - array-like [n, m]
-  design - array-like [n, q]
-  lr - learning rate
-  batch_size - number of data points for minibatch SGD
-  num_epochs - number of passes through the data
-  shuffle - randomly sample data points in each minibatch
-  log_dir - output directory for tensorboard
+  Returns:
 
-  Return:
+    array containing log mean parameters (``[m, p]``)
 
-  log mu - array [m, p]
+  Notes:
+
+    Marginally, the observed counts
+
+      .. math:: x_{ij} \mid s_{i}, \mu_{j} \sim \operatorname{Poisson}(s_i \mu_j)
+
+    If ``design`` is ``None``, then the solution is analytic.
 
   """
   data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, None, lr, batch_size, num_epochs, log_dir)
@@ -264,25 +272,39 @@ def ebpm_point(x, s=None, onehot=None, design=None, lr=1e-2, batch_size=100, num
                 num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
 
 def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
-  """Return fitted parameters assuming g is a Gamma distribution
+  r"""Return fitted parameters for a point mass expression model for each column
+  of ``x``
 
-  Parameters:
+  Args:
 
-  x - array-like [n, p]
-  s - array-like [n, 1]
-  onehot - array-like [n, m]
-  design - array-like [n, q]
-  init - (log_mu, log_phi) [1, p]
-  lr - learning rate
-  batch_size - number of data points for minibatch SGD
-  num_epochs - number of passes through the data
-  shuffle - randomly sample data points in each minibatch
-  log_dir - output directory for tensorboard
+    x (array-like ``[n, p]``): observed counts
+    s (array-like ``[n, 1]``, optional): size factors 
+    onehot (array-like ``[n, m]``, optional): mapping of samples to conditions
+    design (array-like ``[n, q]``, optional): design matrix of observed covariates
+    lr (`float`): learning rate
+    batch_size (`int`): number of data points for minibatch SGD
+    num_epochs (`int`): number of passes through the data
+    shuffle (`bool`): randomly sample data points in each minibatch
+    log_dir (`str`): output directory for TensorBoard
 
-  Return:
+  Returns:
 
-  log mu - array [m, p]
-  neg_log phi - array[m, p]
+    Two arrays containing the log mean and log inverse dispersion parameters
+    (``[m, p]``)
+
+  Notes:
+
+    Marginally, the observed counts
+
+    .. math::
+
+      x_{ij} \mid s_{i}, \lambda_{ij} &\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+      \lambda_{ij} &\sim \operatorname{Gamma}(\phi_j^{-1}, \mu_j^{-1}\phi_j^{-1})
+
+    In this model, the Gamma distribution is parameterized by shape and rate,
+    with mean :math:`\mu_j` and variance :math:`\mu_j^2\phi_j`. Marginally, the
+    observed counts are negative binomial distributed with mean :math:`\mu_j` and
+    dispersion :math:`\phi_j`.
 
   """
   data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, num_epochs, log_dir)
@@ -305,27 +327,40 @@ def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_si
               num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
 
 def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
-  """Return fitted parameters assuming g is a point-Gamma distribution
+  r"""Return fitted parameters assuming for a point-Gamma expression model for
+  each column of ``x``
 
+  Args:
 
-  Parameters:
+    x (array-like ``[n, p]``): observed counts
+    s (array-like ``[n, 1]``, optional): size factors 
+    onehot (array-like ``[n, m]``, optional): mapping of samples to conditions
+    design (array-like ``[n, q]``, optional): design matrix of observed covariates
+    lr (`float`): learning rate
+    batch_size (`int`): number of data points for minibatch SGD
+    num_epochs (`int`): number of passes through the data
+    shuffle (`bool`): randomly sample data points in each minibatch
+    log_dir (`str`): output directory for TensorBoard
 
-  x - array-like [n, p]
-  s - array-like [n, 1]
-  onehot - array-like [n, m]
-  design - array-like [n, q]
-  init - (log_mu, log_phi) [1, p]
-  lr - learning rate
-  batch_size - number of data points for minibatch SGD
-  num_epochs - number of passes through the data
-  shuffle - randomly sample data points in each minibatch
-  log_dir - output directory for tensorboard
+  Returns:
 
-  Return:
+    Three arrays containing the log mean, log inverse dispersion, and logodds
+    parameters (``[m, p]``)
 
-  log mu - array [m, p]
-  neg_log phi - array[m, p]
-  logit_pi - array[m, p]
+  Notes:
+
+    Marginally, the observed counts
+
+    .. math::
+
+      x_{ij} \mid s_{i}, \lambda_{ij} &\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+      \lambda_{ij} &\sim \pi_j \delta_0(\cdot) + (1 - \pi_j)\operatorname{Gamma}(\phi_j^{-1}, \mu_j^{-1}\phi_j^{-1})
+
+    In this model, the Gamma distribution is parameterized by shape and rate,
+    with mean :math:`\mu_j` and variance :math:`\mu_j^2\phi_j`. Marginally, the
+    observed counts are zero-inflated negative binomial distributed, where the
+    negative binomial component has mean :math:`\mu_j` and dispersion
+    :math:`\phi_j`.
 
   """
   data, n, p, k, m, log_dir = _check_args(x, s, onehot, design, init, lr, batch_size, num_epochs, log_dir)
