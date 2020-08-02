@@ -30,6 +30,7 @@ def _nb_mix_llik(x, s, log_mean, log_inv_disp):
        + torch.lgamma(x + inv_disp)
        - torch.lgamma(inv_disp)
        - torch.lgamma(x + 1))
+  assert torch.isfinite(L).all()
   return L.sum(dim=2)
 
 def _nb_mix_loss(z, x, s, pi, log_mean, log_inv_disp, eps=1e-16):
@@ -37,7 +38,7 @@ def _nb_mix_loss(z, x, s, pi, log_mean, log_inv_disp, eps=1e-16):
   # TODO: fixed uniform prior
   return -(z * (L - torch.log(pi))).mean()
 
-def ebpm_gam_mix_em(x, s, k, y=None, pi=None, lr=1e-2, num_epochs=100, max_em_iters=10, shuffle=False, num_workers=0, log_dir=None):
+def ebpm_gam_mix_em(x, s, k, y=None, pi=None, z=None, log_mean=None, lr=1e-2, num_epochs=100, max_em_iters=10, shuffle=False, num_workers=0, log_dir=None):
   data, n, p, _, _, log_dir = mpebpm.sgd._check_args(x, s, None, None, None, lr, x.shape[0], num_epochs, log_dir)
   collate_fn = getattr(data, 'collate_fn', td.dataloader.default_collate)
   # TODO: very hard to do minibatch SGD in this scheme, since we need to batch
@@ -51,13 +52,21 @@ def ebpm_gam_mix_em(x, s, k, y=None, pi=None, lr=1e-2, num_epochs=100, max_em_it
     device = 'cuda:0'
   else:
     device = 'cpu:0'
-  z = torch.rand([n, k], dtype=torch.float, requires_grad=False, device=device)
+  if z is not None:
+    assert z.shape == (n, k)
+    z = torch.tensor(z, dtype=torch.float, requires_grad=False, device=device)
+  else:
+    z = torch.rand([n, k], dtype=torch.float, requires_grad=False, device=device)
   z /= z.sum(dim=1, keepdim=True)
-  log_mean = torch.log1p(torch.matmul(z.T, torch.tensor(x, dtype=torch.float).cuda())) - torch.log(torch.matmul(z.T, torch.tensor(s, dtype=torch.float).cuda()))
-  log_mean.requires_grad = True
+  if log_mean is not None:
+    assert log_mean.shape == (k, p)
+    log_mean = torch.tensor(log_mean, dtype=torch.float, requires_grad=True, device=device)
+  else:
+    log_mean = torch.log1p(torch.matmul(z.T, torch.tensor(x, dtype=torch.float).cuda())) - torch.log(torch.matmul(z.T, torch.tensor(s, dtype=torch.float).cuda()))
+    log_mean.requires_grad = True
   log_inv_disp = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
   if pi is None:
-    pi = torch.new_full([k, 1], 1 / k, device=device)
+    pi = torch.full([1, k], 1 / k, dtype=torch.float, device=device)
   else:
     pi = torch.tensor(pi, dtype=torch.float, device=device)
   params = [log_mean, log_inv_disp]
@@ -175,12 +184,13 @@ class EBPMGammaMix(torch.nn.Module):
           writer.add_scalar(f'loss/err', err.mean(), global_step)
           writer.add_scalar(f'loss/kl', kl.mean(), global_step)
           writer.add_scalar(f'loss/elbo', elbo, global_step)
+          if y is not None:
+            with torch.no_grad():
+              lz = torch.nn.functional.binary_cross_entropy(z, y)
+              writer.add_scalar(f'loss/cross_entropy', lz, global_step)
           with torch.no_grad():
-            lz = torch.nn.functional.binary_cross_entropy(z, y)
             lx = _nb_mix_llik(x, s, self.log_mean, self.log_inv_disp).sum(dim=0)
           writer.add_scalar('loss/nll/diff', lx[0] - lx[1], global_step)
-          if y is not None:
-            writer.add_scalar(f'loss/cross_entropy', lz, global_step)
           writer.add_scalar('encoder/w1_l2', torch.norm(self.encoder[0].weight.grad), global_step)
           writer.add_scalar('encoder/w2_l2', torch.norm(self.encoder[2].weight.grad), global_step)
         global_step += 1
