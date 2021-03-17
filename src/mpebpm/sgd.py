@@ -326,6 +326,28 @@ def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_si
               params=params, key='gamma', lr=lr, batch_size=batch_size,
               num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
 
+def ebpm_gamma_contrasts(x, contrasts, s=None, design=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
+  data, n, p, k, m, log_dir = _check_args(x, s, contrasts, design, init, lr, batch_size, num_epochs, log_dir)
+  if torch.cuda.is_available():
+    device = 'cuda'
+  else:
+    device = 'cpu'
+  init = ebpm_gamma(x, s, design=design, lr=lr, batch_size=batch_size,
+                    num_epochs=num_epochs, shuffle=shuffle)
+  if not np.isfinite(init[1]).all():
+    raise RuntimeError('data are not consistent with non-zero variation')
+  log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True, device=device)
+  log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True, device=device)
+  diff_log_mean = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
+  diff_log_inv_disp = torch.zeros([k, p], dtype=torch.float, requires_grad=True, device=device)
+  params = [log_mean, log_inv_disp, diff_log_mean, diff_log_inv_disp]
+  if design is not None:
+    beta = torch.zeros([m, p], dtype=torch.float, requires_grad=True, device=device)
+    params.append(beta)
+  return _sgd(data, onehot=onehot, design=design, llik=_ebpm_gamma_constrasts_loss,
+              params=params, key='gamma', lr=lr, batch_size=batch_size,
+              num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
+
 def ebpm_point_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
   r"""Return fitted parameters assuming for a point-Gamma expression model for
   each column of ``x``
