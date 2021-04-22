@@ -272,8 +272,8 @@ def ebpm_point(x, s=None, onehot=None, design=None, lr=1e-2, batch_size=100, num
                 num_epochs=num_epochs, shuffle=shuffle, log_dir=log_dir)
 
 def ebpm_gamma(x, s=None, onehot=None, design=None, init=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, log_dir=None):
-  r"""Return fitted parameters for a point mass expression model for each column
-  of ``x``
+  r"""Return fitted parameters for a Gamma expression model for each column of
+  ``x``
 
   Args:
 
