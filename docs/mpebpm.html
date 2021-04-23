@@ -35,6 +35,113 @@
             
   <div class="section" id="api-reference">
 <h1>API reference<a class="headerlink" href="#api-reference" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-mpebpm.gam_mix">
+<span id="mpebpm-gam-mix-module"></span><h2>mpebpm.gam_mix module<a class="headerlink" href="#module-mpebpm.gam_mix" title="Permalink to this headline">¶</a></h2>
+<p>Model-based clustering of scRNA-seq data</p>
+<p>We assume</p>
+<blockquote>
+<div><div class="math notranslate nohighlight">
+\[\begin{split}x_{ij} \mid s_{i}, \lambda_{ij} &amp;\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+\lambda_{ij} \mid \boldsymbol{\pi}_i, \boldsymbol{\mu}_k, \boldsymbol{\phi}_k &amp;\sim \sum_{k=1}^{K} \pi_{ik} \operatorname{Gamma}(\phi_{kj}^{-1}, \phi_{kj}^{-1}\mu_{kj}^{-1}),\end{split}\]</div>
+</div></blockquote>
+<p>where</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(x_{ij}\)</span> denotes the number of molecules of gene <span class="math notranslate nohighlight">\(j = 1, \ldots, p\)</span>
+observed in cell <span class="math notranslate nohighlight">\(i = 1, \ldots, n\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(x_{i+} \triangleq \sum_j x_{ij}\)</span> denotes the total number of molecules
+observed in cell <span class="math notranslate nohighlight">\(i\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(\boldsymbol{\pi}_i\)</span> denotes cluster assignment probabilities for cell <span class="math notranslate nohighlight">\(i\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(\boldsymbol{\mu}_k\)</span> denotes the cluster “centroid” for cluster <span class="math notranslate nohighlight">\(k\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(\boldsymbol{\phi}_k\)</span> describes stochastic perturbations within each cluster</p></li>
+</ul>
+</div></blockquote>
+<p>The intuition behind this model is that each cluster <span class="math notranslate nohighlight">\(k\)</span> is defined by a
+collection of independent Gamma distributions (parameterized by shape and
+rate), one per gene <span class="math notranslate nohighlight">\(j\)</span>, which describe the distribution of true gene
+expression for each gene in each cluster <a class="reference internal" href="references.html#sarkar2020" id="id1"><span>[Sarkar2020]</span></a>. In this
+parameterization, each Gamma distribution has mean <span class="math notranslate nohighlight">\(\mu_{jk}\)</span> and
+variance <span class="math notranslate nohighlight">\(\mu_{jk}^{2}\phi_{jk}\)</span>, and the marginal likelihood is a
+mixture of negative binomials</p>
+<blockquote>
+<div><div class="math notranslate nohighlight">
+\[p(x_{ij} \mid x_{i+}, \boldsymbol{\pi}_i, \boldsymbol{\mu}_k, \boldsymbol{\phi}_k) = \sum_{k=1}^{K} \pi_{ik} \frac{\Gamma(x_{ij} + 1 / \phi_{kj})}{\Gamma(1 / \phi_{kj})\Gamma(x_{ij} + 1)}\left(\frac{x_{i+}\mu_{kj}\phi_{kj}}{1 + x_{i+}\mu_{kj}\phi_{kj}}\right)^{x_{ij}} \left(\frac{1}{1 + x_{i+}\mu_{kj}\phi_{kj}}\right)^{1/\phi_{kj}}.\]</div>
+</div></blockquote>
+<p>This module provides implementation of batch EM and amortized inference for
+this model.</p>
+<dl class="py class">
+<dt id="mpebpm.gam_mix.EBPMGammaMix">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">mpebpm.gam_mix.</span></code><code class="sig-name descname"><span class="pre">EBPMGammaMix</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_mean</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_inv_disp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">128</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.gam_mix.EBPMGammaMix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
+<p>Amortized inference for model-based clustering</p>
+<dl class="py method">
+<dt id="mpebpm.gam_mix.EBPMGammaMix.fit">
+<code class="sig-name descname"><span class="pre">fit</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_epochs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_workers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.gam_mix.EBPMGammaMix.fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fit the model</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">p]</span></code>) – observed sounts</p></li>
+<li><p><strong>s</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>) – size factors</p></li>
+<li><p><strong>y</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">k]</span></code>, optional) – true labels (for testing)</p></li>
+<li><p><strong>lr</strong> (<cite>float</cite>) – learning rate</p></li>
+<li><p><strong>batch_size</strong> (<cite>int</cite>) – number of data points for minibatch SGD</p></li>
+<li><p><strong>num_epochs</strong> (<cite>int</cite>) – number of passes through the data</p></li>
+<li><p><strong>shuffle</strong> (<cite>bool</cite>) – randomly sample data points in each minibatch</p></li>
+<li><p><strong>num_workers</strong> (<cite>int</cite>) – number of workers to load minibatches</p></li>
+<li><p><strong>log_dir</strong> (<cite>str</cite>) – output directory for TensorBoard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><cite>self</cite></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="mpebpm.gam_mix.EBPMGammaMix.forward">
+<code class="sig-name descname"><span class="pre">forward</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.gam_mix.EBPMGammaMix.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the posterior mean mixture weights given the observed counts</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="mpebpm.gam_mix.EBPMGammaMix.training">
+<code class="sig-name descname"><span class="pre">training</span></code><em class="property"><span class="pre">:</span> <span class="pre">bool</span></em><a class="headerlink" href="#mpebpm.gam_mix.EBPMGammaMix.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt id="mpebpm.gam_mix.ebpm_gam_mix_em">
+<code class="sig-prename descclassname"><span class="pre">mpebpm.gam_mix.</span></code><code class="sig-name descname"><span class="pre">ebpm_gam_mix_em</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_mean</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_epochs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_em_iters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_workers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.gam_mix.ebpm_gam_mix_em" title="Permalink to this definition">¶</a></dt>
+<dd><p>Batch EM for model-based clustering based on a mixture of Gammas expression
+model</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">p]</span></code>) – observed counts</p></li>
+<li><p><strong>s</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>, optional) – size factors</p></li>
+<li><p><strong>k</strong> (<cite>int</cite>) – number of components</p></li>
+<li><p><strong>y</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>, optional) – known labels (for numerical experiments)</p></li>
+<li><p><strong>pi</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[1,</span> <span class="pre">k]</span></code>, optional) – prior mixture weight on components</p></li>
+<li><p><strong>z</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">k]</span></code>, optional) – initial mixture weights for each sample</p></li>
+<li><p><strong>log_mean</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[k,</span> <span class="pre">p]</span></code>, optional) – initial mean parameters for each component</p></li>
+<li><p><strong>lr</strong> (<cite>float</cite>) – learning rate</p></li>
+<li><p><strong>num_epochs</strong> (<cite>int</cite>) – number of passes through the data</p></li>
+<li><p><strong>max_em_iters</strong> (<cite>int</cite>) – number of EM iterations</p></li>
+<li><p><strong>shuffle</strong> (<cite>bool</cite>) – randomly sample data points in each minibatch</p></li>
+<li><p><strong>num_workers</strong> (<cite>int</cite>) – number of workers to load data</p></li>
+<li><p><strong>log_dir</strong> (<cite>str</cite>) – output directory for TensorBoard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Three arrays containing the log mean and log inverse dispersion parameters
+(<code class="docutils literal notranslate"><span class="pre">[m,</span> <span class="pre">p]</span></code>) and the mixture weights for each sample (<code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">k]</span></code>).</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
 <div class="section" id="module-mpebpm.sgd">
 <span id="mpebpm-sgd-module"></span><h2>mpebpm.sgd module<a class="headerlink" href="#module-mpebpm.sgd" title="Permalink to this headline">¶</a></h2>
 <p>Empirical Bayes Poisson Means via SGD</p>
@@ -49,8 +156,13 @@ different priors (for each gene)</p></li>
 <dl class="py function">
 <dt id="mpebpm.sgd.ebpm_gamma">
 <code class="sig-prename descclassname"><span class="pre">mpebpm.sgd.</span></code><code class="sig-name descname"><span class="pre">ebpm_gamma</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">onehot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">design</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_epochs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.sgd.ebpm_gamma" title="Permalink to this definition">¶</a></dt>
+<<<<<<< HEAD
 <dd><p>Return fitted parameters for a Gamma expression model for each column of
 <code class="docutils literal notranslate"><span class="pre">x</span></code></p>
+=======
+<dd><p>Return fitted parameters for a point mass expression model for each column
+of <code class="docutils literal notranslate"><span class="pre">x</span></code></p>
+>>>>>>> Document Gamma mixture expression model
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -223,6 +335,7 @@ implementing a new DataSet type which can exploit this efficient slice.</p>
 <h3>Navigation</h3>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.gam_mix">mpebpm.gam_mix module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.sgd">mpebpm.sgd module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.sparse">mpebpm.sparse module</a></li>
 </ul>

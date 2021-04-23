@@ -1,4 +1,36 @@
-"""Massively parallel EBPM for model-based clustering
+r"""Model-based clustering of scRNA-seq data
+
+We assume
+
+  .. math:: 
+
+    x_{ij} \mid s_{i}, \lambda_{ij} &\sim \operatorname{Poisson}(s_i \lambda_{ij})\\
+    \lambda_{ij} \mid \boldsymbol{\pi}_i, \boldsymbol{\mu}_k, \boldsymbol{\phi}_k &\sim \sum_{k=1}^{K} \pi_{ik} \operatorname{Gamma}(\phi_{kj}^{-1}, \phi_{kj}^{-1}\mu_{kj}^{-1}),
+
+where
+
+   * :math:`x_{ij}` denotes the number of molecules of gene :math:`j = 1, \ldots, p`
+     observed in cell :math:`i = 1, \ldots, n`
+   * :math:`x_{i+} \triangleq \sum_j x_{ij}` denotes the total number of molecules
+     observed in cell :math:`i`
+   * :math:`\boldsymbol{\pi}_i` denotes cluster assignment probabilities for cell :math:`i`
+   * :math:`\boldsymbol{\mu}_k` denotes the cluster "centroid" for cluster :math:`k`
+   * :math:`\boldsymbol{\phi}_k` describes stochastic perturbations within each cluster
+
+The intuition behind this model is that each cluster :math:`k` is defined by a
+collection of independent Gamma distributions (parameterized by shape and
+rate), one per gene :math:`j`, which describe the distribution of true gene
+expression for each gene in each cluster [Sarkar2020]_. In this
+parameterization, each Gamma distribution has mean :math:`\mu_{jk}` and
+variance :math:`\mu_{jk}^{2}\phi_{jk}`, and the marginal likelihood is a
+mixture of negative binomials
+
+  .. math::
+
+    p(x_{ij} \mid x_{i+}, \boldsymbol{\pi}_i, \boldsymbol{\mu}_k, \boldsymbol{\phi}_k) = \sum_{k=1}^{K} \pi_{ik} \frac{\Gamma(x_{ij} + 1 / \phi_{kj})}{\Gamma(1 / \phi_{kj})\Gamma(x_{ij} + 1)}\left(\frac{x_{i+}\mu_{kj}\phi_{kj}}{1 + x_{i+}\mu_{kj}\phi_{kj}}\right)^{x_{ij}} \left(\frac{1}{1 + x_{i+}\mu_{kj}\phi_{kj}}\right)^{1/\phi_{kj}}.
+
+This module provides implementation of batch EM and amortized inference for
+this model.
 
 """
 import mpebpm.sgd
@@ -39,6 +71,31 @@ def _nb_mix_loss(z, x, s, pi, log_mean, log_inv_disp, eps=1e-16):
   return -(z * (L - torch.log(pi))).mean()
 
 def ebpm_gam_mix_em(x, s, k, y=None, pi=None, z=None, log_mean=None, lr=1e-2, num_epochs=100, max_em_iters=10, shuffle=False, num_workers=0, log_dir=None):
+  r"""Batch EM for model-based clustering based on a mixture of Gammas expression
+  model
+
+  Args:
+
+    x (array-like ``[n, p]``): observed counts
+    s (array-like ``[n, 1]``, optional): size factors 
+    k (`int`): number of components
+    y (array-like ``[n, 1]``, optional): known labels (for numerical experiments)
+    pi (array-like ``[1, k]``, optional): prior mixture weight on components
+    z (array-like ``[n, k]``, optional): initial mixture weights for each sample
+    log_mean (array-like ``[k, p]``, optional): initial mean parameters for each component
+    lr (`float`): learning rate
+    num_epochs (`int`): number of passes through the data
+    max_em_iters (`int`): number of EM iterations
+    shuffle (`bool`): randomly sample data points in each minibatch
+    num_workers (`int`): number of workers to load data
+    log_dir (`str`): output directory for TensorBoard
+
+  Returns:
+
+    Three arrays containing the log mean and log inverse dispersion parameters
+    (``[m, p]``) and the mixture weights for each sample (``[n, k]``).
+
+  """
   data, n, p, _, _, log_dir = mpebpm.sgd._check_args(x, s, None, None, None, lr, x.shape[0], num_epochs, log_dir)
   collate_fn = getattr(data, 'collate_fn', td.dataloader.default_collate)
   # TODO: very hard to do minibatch SGD in this scheme, since we need to batch
@@ -111,9 +168,11 @@ class EBPMGammaMix(torch.nn.Module):
   def __init__(self, p, k, log_mean=None, log_inv_disp=None, hidden_dim=128):
     """Initialize the model
 
-    p - number of genes
-    k - number of clusters
-    hidden_dim - hidden layer size in the encoder network
+    Args:
+
+      p (`int`) - number of genes
+      k (`int`) - number of clusters
+      hidden_dim (`int`) - hidden layer size in the encoder network
 
     """
     super().__init__()
@@ -136,14 +195,27 @@ class EBPMGammaMix(torch.nn.Module):
     self.k = torch.tensor(k, dtype=torch.float)
 
   def forward(self, x):
+    """Return the posterior mean mixture weights given the observed counts"""
     return self.encoder(x)
 
   def fit(self, x, s, y=None, lr=1e-2, batch_size=100, num_epochs=100, shuffle=False, num_workers=0, log_dir=None):
-    """Fit the model
+    """Fit the model to observed data.
 
-    x - array-like [n, p]
-    s - array-like [n, 1]
-    y - one-hot encoded true labels (for testing) [n, k]
+    Args:
+
+      x (array-like ``[n, p]``): observed sounts
+      s (array-like ``[n, 1]``): size factors
+      y (array-like ``[n, k]``, optional): true labels (for testing)
+      lr (`float`): learning rate
+      batch_size (`int`): number of data points for minibatch SGD
+      num_epochs (`int`): number of passes through the data
+      shuffle (`bool`): randomly sample data points in each minibatch
+      num_workers (`int`): number of workers to load minibatches
+      log_dir (`str`): output directory for TensorBoard
+
+    Returns:
+
+      `self`
 
     """
     if torch.cuda.is_available():
