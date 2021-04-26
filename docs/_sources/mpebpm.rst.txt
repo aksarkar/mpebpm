@@ -18,3 +18,9 @@ mpebpm.sparse module
    :undoc-members:
    :show-inheritance:
 
+mpebpm.topics module
+--------------------
+
+.. automodule:: mpebpm.topics
+   :members:
+   :special-members:

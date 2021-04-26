@@ -202,6 +202,158 @@ implementing a new DataSet type which can exploit this efficient slice.</p>
 </dd></dl>
 
 </div>
+<div class="section" id="module-mpebpm.topics">
+<span id="mpebpm-topics-module"></span><h2>mpebpm.topics module<a class="headerlink" href="#module-mpebpm.topics" title="Permalink to this headline">¶</a></h2>
+<p>Noisy topic model</p>
+<p>We propose a noisy topic model combining a Poisson measurement model
+<a class="reference internal" href="references.html#sarkar2020" id="id1"><span>[Sarkar2020]</span></a> with the low rank expression model</p>
+<blockquote>
+<div><div class="math notranslate nohighlight">
+\[\lambda_{ij} \sim g_{ij}(\cdot) = \operatorname{Gamma}(\exp(-(\mathbf{L}\mathbf{H}')_{ij}), \exp(-(\mathbf{L}(\mathbf{F} + \mathbf{H})')_{ij})),\]</div>
+</div></blockquote>
+<p>where the Gamma distribution is parameterized by shape and rate,
+<span class="math notranslate nohighlight">\(\mathbf{L}\)</span> is an <span class="math notranslate nohighlight">\(n \times K\)</span> matrix, <span class="math notranslate nohighlight">\(l_{ik} \geq 0\)</span>,
+<span class="math notranslate nohighlight">\(\sum_k l_{ik} = 1\)</span>, <span class="math notranslate nohighlight">\(\mathbf{F}\)</span> is a <span class="math notranslate nohighlight">\(K \times p\)</span> matrix of
+log mean parameters, and <span class="math notranslate nohighlight">\(\mathbf{H}\)</span> is a <span class="math notranslate nohighlight">\(K \times p\)</span> matrix of
+log dispersion parameters. Marginally, this yields an NB observation model,
+where the means and dispersions for each cell at each gene are convex
+combinations of the topic means and dispersions. The model is fit by maximizing
+the marginal likelihood via stochastic gradient descent, using an inference
+network to amortize inference over observed data.</p>
+<p>This observation model is a linearization of the DCA observation model
+<a class="reference internal" href="references.html#eraslan2019" id="id2"><span>[Eraslan2019]</span></a> (where the decoder is linear rather than non-linear), and is a
+generalization of the LDVAE observation model <a class="reference internal" href="references.html#svensson2020" id="id3"><span>[Svensson2020]</span></a> (where dispersion
+parameters at each gene are not assumed to be constant over observations).</p>
+<dl class="py class">
+<dt id="mpebpm.topics.Encoder">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">mpebpm.topics.</span></code><code class="sig-name descname"><span class="pre">Encoder</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.Encoder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inference network for noisy topic model</p>
+<dl class="py method">
+<dt id="mpebpm.topics.Encoder.__init__">
+<code class="sig-name descname"><span class="pre">__init__</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.Encoder.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize the inference network</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_dim</strong> (<cite>int</cite>) – number of genes</p></li>
+<li><p><strong>hidden_dim</strong> (<cite>int</cite>) – hidden layer dimension (inference network)</p></li>
+<li><p><strong>latent_dim</strong> (<cite>int</cite>) – number of topics</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="mpebpm.topics.Encoder.forward">
+<code class="sig-name descname"><span class="pre">forward</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.Encoder.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the latent loadings for observations <cite>x</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="mpebpm.topics.Log1p">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">mpebpm.topics.</span></code><code class="sig-name descname"><span class="pre">Log1p</span></code><a class="headerlink" href="#mpebpm.topics.Log1p" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the log1p transform elementwise</p>
+<dl class="py method">
+<dt id="mpebpm.topics.Log1p.__init__">
+<code class="sig-name descname"><span class="pre">__init__</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.Log1p.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes internal Module state, shared by both nn.Module and ScriptModule.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="mpebpm.topics.Log1p.forward">
+<code class="sig-name descname"><span class="pre">forward</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.Log1p.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the log1p transform elementwise</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="mpebpm.topics.NoisyTopicModel">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">mpebpm.topics.</span></code><code class="sig-name descname"><span class="pre">NoisyTopicModel</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">128</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt id="mpebpm.topics.NoisyTopicModel.__init__">
+<code class="sig-name descname"><span class="pre">__init__</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">128</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize the noisy topic model</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_dim</strong> (<cite>int</cite>) – number of genes</p></li>
+<li><p><strong>hidden_dim</strong> (<cite>int</cite>) – hidden layer dimension (inference network)</p></li>
+<li><p><strong>latent_dim</strong> (<cite>int</cite>) – number of topics</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt id="mpebpm.topics.NoisyTopicModel.encoder">
+<code class="sig-name descname"><span class="pre">encoder</span></code><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel.encoder" title="Permalink to this definition">¶</a></dt>
+<dd><p>inference network</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><cite>mpebpm.topics.Encoder</cite></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="mpebpm.topics.NoisyTopicModel.F">
+<code class="sig-name descname"><span class="pre">F</span></code><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel.F" title="Permalink to this definition">¶</a></dt>
+<dd><p>log mean parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><cite>torch.tensor</cite>, <code class="docutils literal notranslate"><span class="pre">[latent_dim,</span> <span class="pre">input_dim]</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="mpebpm.topics.NoisyTopicModel.H">
+<code class="sig-name descname"><span class="pre">H</span></code><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel.H" title="Permalink to this definition">¶</a></dt>
+<dd><p>log inverse dispersion parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><cite>torch.tensor</cite>, <code class="docutils literal notranslate"><span class="pre">[latent_dim,</span> <span class="pre">input_dim]</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py method">
+<dt id="mpebpm.topics.NoisyTopicModel.fit">
+<code class="sig-name descname"><span class="pre">fit</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_epochs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel.fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fit the model to observed counts <code class="docutils literal notranslate"><span class="pre">x</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">p]</span></code>) – observed counts</p></li>
+<li><p><strong>s</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">1]</span></code>, optional) – size factors</p></li>
+<li><p><strong>onehot</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">m]</span></code>, optional) – mapping of samples to conditions</p></li>
+<li><p><strong>design</strong> (array-like <code class="docutils literal notranslate"><span class="pre">[n,</span> <span class="pre">q]</span></code>, optional) – design matrix of observed covariates</p></li>
+<li><p><strong>lr</strong> (<cite>float</cite>) – learning rate</p></li>
+<li><p><strong>batch_size</strong> (<cite>int</cite>) – number of data points for minibatch SGD</p></li>
+<li><p><strong>num_epochs</strong> (<cite>int</cite>) – number of passes through the data</p></li>
+<li><p><strong>shuffle</strong> (<cite>bool</cite>) – randomly sample data points in each minibatch</p></li>
+<li><p><strong>log_dir</strong> (<cite>str</cite>) – output directory for TensorBoard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><cite>self</cite></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="mpebpm.topics.NoisyTopicModel.forward">
+<code class="sig-name descname"><span class="pre">forward</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#mpebpm.topics.NoisyTopicModel.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the negative log likelihood of the observed counts <cite>x</cite> and size
+factors <cite>s</cite>.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
 </div>
 
 
@@ -225,6 +377,7 @@ implementing a new DataSet type which can exploit this efficient slice.</p>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.sgd">mpebpm.sgd module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.sparse">mpebpm.sparse module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mpebpm.topics">mpebpm.topics module</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
